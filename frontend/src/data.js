@@ -1,7 +1,21 @@
 // Camera-measured exercises (rep counting and scoring).
-export const EXERCISES = ['Squat', 'Side Arm Raise', 'Toe Touch'];
+export const EXERCISES = [
+  'Squat',
+  'Side Arm Raise',
+  'Toe Touch',
+  'Bilateral mini-squat',
+  'Standing wall slide',
+  'Bilateral standing heel raise',
+  'Standing full-can scapular-plane elevation',
+  'Forward step-up and step-down',
+  'Modified supine bridge',
+  'Standing resisted shoulder external rotation',
+  'Assisted eccentric heel lowering',
+];
+
 // Exercises that only carry a demonstration video; the camera does not measure them.
 export const VIDEO_ONLY_EXERCISES = [];
+
 export const INSTRUCTIONS = {
   Squat: [
     ['Starting position', 'Stand side-on to the camera with your feet shoulder-width apart and your arms relaxed or crossed in front.'],
@@ -21,18 +35,85 @@ export const INSTRUCTIONS = {
     ['Roll up', 'Return slowly to standing, taking about 2 to 5 seconds for each repetition.'],
     ['Breathing', 'Breathe out as you bend and in as you come up. Stop if you feel dizzy or feel pain.'],
   ],
+  'Bilateral mini-squat': [
+    ['Starting position', 'Stand side-on with feet shoulder-width apart, knees slightly soft.'],
+    ['Mini-squat', 'Bend knees through 30–45° partial range while shifting hips back and keeping trunk upright.'],
+    ['Return', 'Drive through feet to return to upright standing position.'],
+  ],
+  'Standing wall slide': [
+    ['Starting position', 'Stand with your back flat against a smooth wall, feet shoulder-width apart.'],
+    ['Slide down', 'Slide down the wall into a gentle knee bend, keeping spine supported.'],
+    ['Slide up', 'Push back up to the starting position with controlled tempo.'],
+  ],
+  'Bilateral standing heel raise': [
+    ['Starting position', 'Stand tall with feet hip-width apart on a level surface.'],
+    ['Elevate', 'Press down through the balls of both feet to lift heels smoothly.'],
+    ['Lower', 'Lower heels slowly back to the ground.'],
+  ],
+  'Standing full-can scapular-plane elevation': [
+    ['Starting position', 'Stand facing camera, arms at your sides with thumbs pointed up in the scapular plane (30° forward).'],
+    ['Elevate', 'Raise arms smoothly to shoulder height (70–90°), keeping neck and shoulders relaxed.'],
+    ['Lower', 'Lower arms back down with controlled tempo.'],
+  ],
+  'Forward step-up and step-down': [
+    ['Starting position', 'Stand facing a secure low step or aerobic bench.'],
+    ['Step up', 'Step onto the platform with the lead foot, transferring weight smoothly.'],
+    ['Step down', 'Lower back to the floor under control.'],
+  ],
+  'Modified supine bridge': [
+    ['Starting position', 'Lie on your back with knees bent and feet flat on the mat.'],
+    ['Bridge', 'Engage glutes and core to lift hips towards a neutral alignment.'],
+    ['Lower', 'Lower hips back to the mat with control.'],
+  ],
+  'Standing resisted shoulder external rotation': [
+    ['Starting position', 'Stand upright with elbow bent at 90° tucked by your side.'],
+    ['Rotate out', 'Rotate forearm outward smoothly without moving elbow away from torso.'],
+    ['Return', 'Slowly return to starting position.'],
+  ],
+  'Assisted eccentric heel lowering': [
+    ['Starting position', 'Stand on low step edge with balls of feet supported, hand on wall for balance.'],
+    ['Lower', 'Slowly lower heel below platform level with control.'],
+    ['Reset', 'Step up using sound leg to reset.'],
+  ],
 };
 
-export const ALL_EXERCISES = [...EXERCISES, ...VIDEO_ONLY_EXERCISES];
-
-// Team-supplied demonstration clips shipped with the app (public/demo/*.mp4).
+// Team-supplied demonstration clips shipped with the app
 export const DEMO_REFERENCES = [
-  { referenceId: 'demo-squat', versionId: 'demo-squat-v1', version: 1, exerciseName: 'Squat', cameraView: 'side',
-    status: 'approved', mediaPath: 'demo:squat', demo: true, ownerUid: 'C-001' },
-  { referenceId: 'demo-toe-touch', versionId: 'demo-toe-touch-v1', version: 1, exerciseName: 'Toe Touch', cameraView: 'side',
-    status: 'approved', mediaPath: 'demo:toetouch', demo: true, ownerUid: 'C-001' },
+  { referenceId: 'demo-squat', versionId: 'demo-squat-v1', version: 1, exerciseName: 'Squat', cameraView: 'side', status: 'approved', mediaPath: 'demo:squat', demo: true, ownerUid: 'C-001' },
+  { referenceId: 'demo-toe-touch', versionId: 'demo-toe-touch-v1', version: 1, exerciseName: 'Toe Touch', cameraView: 'side', status: 'approved', mediaPath: 'demo:toetouch', demo: true, ownerUid: 'C-001' },
   { referenceId: 'demo-arm-raise', versionId: 'demo-arm-raise-v1', version: 1, exerciseName: 'Side Arm Raise', cameraView: 'front', status: 'approved', mediaPath: 'demo:armraise', demo: true, ownerUid: 'C-001' },
+  { referenceId: 'demo-mini-squat', versionId: 'demo-mini-squat-v1', version: 1, exerciseName: 'Bilateral mini-squat', cameraView: 'side', status: 'approved', mediaPath: 'demo:squat', demo: true, ownerUid: 'C-001' },
+  { referenceId: 'demo-wall-slide', versionId: 'demo-wall-slide-v1', version: 1, exerciseName: 'Standing wall slide', cameraView: 'side', status: 'approved', mediaPath: 'demo:squat', demo: true, ownerUid: 'C-001' },
+  { referenceId: 'demo-heel-raise', versionId: 'demo-heel-raise-v1', version: 1, exerciseName: 'Bilateral standing heel raise', cameraView: 'side', status: 'approved', mediaPath: 'demo:toetouch', demo: true, ownerUid: 'C-001' },
+  { referenceId: 'demo-scaption', versionId: 'demo-scaption-v1', version: 1, exerciseName: 'Standing full-can scapular-plane elevation', cameraView: 'front', status: 'approved', mediaPath: 'demo:armraise', demo: true, ownerUid: 'C-001' },
+  { referenceId: 'demo-step-up', versionId: 'demo-step-up-v1', version: 1, exerciseName: 'Forward step-up and step-down', cameraView: 'side', status: 'approved', mediaPath: 'demo:squat', demo: true, ownerUid: 'C-001' },
+  { referenceId: 'demo-bridge', versionId: 'demo-bridge-v1', version: 1, exerciseName: 'Modified supine bridge', cameraView: 'side', status: 'approved', mediaPath: 'demo:squat', demo: true, ownerUid: 'C-001' },
+  { referenceId: 'demo-shoulder-er', versionId: 'demo-shoulder-er-v1', version: 1, exerciseName: 'Standing resisted shoulder external rotation', cameraView: 'front', status: 'approved', mediaPath: 'demo:armraise', demo: true, ownerUid: 'C-001' },
+  { referenceId: 'demo-heel-lowering', versionId: 'demo-heel-lowering-v1', version: 1, exerciseName: 'Assisted eccentric heel lowering', cameraView: 'side', status: 'approved', mediaPath: 'demo:toetouch', demo: true, ownerUid: 'C-001' },
 ];
+
+export function getCustomExercises() {
+  try {
+    const raw = localStorage.getItem('kineticare_custom_exercises');
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveCustomExercise(item) {
+  try {
+    const current = getCustomExercises();
+    const updated = [item, ...current.filter(x => x.name !== item.name)].slice(0, 50);
+    localStorage.setItem('kineticare_custom_exercises', JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent('kineticare-exercises-updated'));
+    return updated;
+  } catch {
+    return [];
+  }
+}
+
+export const ALL_EXERCISES = [...EXERCISES, ...VIDEO_ONLY_EXERCISES];
 
 export const DATA = {
   pts: [
@@ -45,7 +126,8 @@ export const DATA = {
     items:[
       { ex:'Squat', t:45, targetReps:5, targetExcursionDeg:45, note:'Stop if you feel sharp pain.',
         referenceId:'demo-squat', referenceVersionId:'demo-squat-v1', referencePath:'references/demo-squat/versions/demo-squat-v1' },
-      { ex:'Side Arm Raise', t:45, targetReps:5, targetExcursionDeg:75, note:'Slow and controlled.' },
+      { ex:'Side Arm Raise', t:45, targetReps:5, targetExcursionDeg:75, note:'Slow and controlled.',
+        referenceId:'demo-arm-raise', referenceVersionId:'demo-arm-raise-v1', referencePath:'references/demo-arm-raise/versions/demo-arm-raise-v1' },
       { ex:'Toe Touch', t:45, targetReps:5, targetExcursionDeg:60, note:'Reach down only as far as is comfortable. Keep your knees soft.',
         referenceId:'demo-toe-touch', referenceVersionId:'demo-toe-touch-v1', referencePath:'references/demo-toe-touch/versions/demo-toe-touch-v1' },
     ]

@@ -1,7 +1,9 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/authContext';
 import { connectedApi } from '../services/atlasRecords';
 import { toast } from '../components/toastBus';
+import { saveCustomExercise } from '../data';
 import Icon from '../components/Icon';
 
 const ExerciseAnimationPreview = lazy(() => import('../components/ExerciseAnimationPreview'));
@@ -12,6 +14,7 @@ const TASKS = [
 ];
 
 export default function KnowledgeExerciseChat({ api = connectedApi }) {
+  const nav = useNavigate();
   const { connectedEnabled } = useAuth();
   const [catalog, setCatalog] = useState([]);
   const [exerciseId, setExerciseId] = useState('EX-KU-000001');
@@ -66,6 +69,20 @@ export default function KnowledgeExerciseChat({ api = connectedApi }) {
     } catch { toast('Clipboard unavailable. Select the guide text to copy it.'); }
   }
 
+  function addExerciseToLibrary() {
+    const name = result?.exercise?.exercise_name || selected?.exercise_name;
+    if (!name) return;
+    saveCustomExercise({
+      name,
+      category: 'Therapeutic Exercise',
+      instructions: result.exercise?.technique || result.plan?.claims?.map(claim => claim.text) || [],
+      targetDeg: 45,
+      targetReps: 5,
+      createdAt: new Date().toISOString(),
+    });
+    toast(`"${name}" added to exercise library! Ready to assign.`);
+  }
+
   return <section aria-labelledby="knowledge-chat-heading" className="education-studio">
     <div className="studio-section-heading"><div><span className="eyebrow">SOURCE-GROUNDED CREATION</span><h2 id="knowledge-chat-heading">From exercise to clear guidance</h2><p className="mut">Choose a movement and the kind of guidance you need. Review the evidence before sharing.</p></div><span className="tag warn">Clinician review required</span></div>
     {!connectedEnabled ? <div className="session-status">Sign in with a connected clinician account to generate and save guides.</div> : <div className="generation-workspace">
@@ -89,7 +106,16 @@ export default function KnowledgeExerciseChat({ api = connectedApi }) {
           {result.plan.missing_requirements.length > 0 && <details className="source-review"><summary>Review gaps ({result.plan.missing_requirements.length})</summary><ul>{result.plan.missing_requirements.map((item, index) => <li key={index}>{item}</li>)}</ul></details>}
           <details className="source-review"><summary>Inspect source evidence ({result.citations.length})</summary>{result.citations.length ? result.citations.map(source => <div className="source-card" key={source.id}><b>{source.title}</b><p className="mut">Chapter {source.chapter_number} · printed pp. {source.printed_page_numbers.join(', ')} · PDF pp. {source.pdf_page_numbers.join(', ')}</p></div>) : <p className="mut">No source citations were returned. Resolve this before using the guide.</p>}</details>
           {result.preview && <Suspense fallback={<p role="status">Loading movement preview…</p>}><ExerciseAnimationPreview key={result._id} descriptor={result.preview} /></Suspense>}
-          <div className="guide-footer"><button type="button" className="btn s" onClick={copyGuide}>Copy draft & review notes</button><p className="mut">Saved to your exercise history · {result.model}. Creating a guide does not publish a patient plan.</p></div>
+          <div className="guide-footer">
+            <div className="row" style={{ flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+              <button type="button" className="btn s" onClick={copyGuide}>Copy draft & review notes</button>
+              <button type="button" className="btn" onClick={addExerciseToLibrary}>
+                Add to Exercise Library
+              </button>
+              <button type="button" className="btn s" onClick={() => nav('/client/patients')}>Assign to Patient</button>
+            </div>
+            <p className="mut">Saved to your exercise history · {result.model}.</p>
+          </div>
         </article> : <div className="card generation-empty"><span className="empty-icon"><Icon name="plan" size={38} /></span><span className="eyebrow">YOUR NEXT EXERCISE GUIDE</span><h2>{selected?.exercise_name ?? 'A clear guide starts here'}</h2><p className="mut">Your generated instructions, movement phases, source citations and review gaps will appear here.</p><div className="guide-skeleton"><i /><i /><i /></div><span className="tag">Choose → generate → review</span></div>}
         {turns.length > 1 && <details className="card"><summary>Previous guides ({turns.length})</summary>{[...turns].reverse().map(turn => <button type="button" key={turn._id} className="guide-history" aria-pressed={result?._id === turn._id} onClick={() => setTurnId(turn._id)}><b>{turn.exercise?.exercise_name ?? 'Exercise clarification'}</b><span>{turn.createdAt ? new Date(turn.createdAt).toLocaleString() : 'Saved guide'}</span></button>)}</details>}
       </div>

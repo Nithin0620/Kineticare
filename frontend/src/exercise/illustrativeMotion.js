@@ -50,9 +50,114 @@ export function sideArmRaisePose(time, durationSeconds = 6, peakDegrees = 75) {
   return { points, shoulderDegrees: peakDegrees * progress, phaseName: phase < 0.12 || phase > 0.92 ? 'Arms at sides' : phase < 0.46 ? 'Raise both arms' : phase < 0.56 ? 'Hold briefly' : 'Lower with control' };
 }
 
+export function toeTouchPose(time, durationSeconds = 6, peakDegrees = 60) {
+  const dur = Math.max(3, durationSeconds || 6);
+  const peak = Math.min(90, Math.max(20, peakDegrees || 60));
+  const phase = ((time % dur) + dur) % dur / dur;
+  const progress = (1 - Math.cos(phase * Math.PI * 2)) / 2;
+  const angleRad = (peak * progress * Math.PI) / 180;
+  
+  const { points } = miniSquatPose(0, 6, 30);
+  const pelvisY = points.pelvis[1];
+  const torsoLength = 0.54;
+  
+  // Hinge at pelvis forward around X axis
+  const headZ = -torsoLength * Math.sin(angleRad);
+  const headY = pelvisY + torsoLength * Math.cos(angleRad);
+  points.chest = [0, pelvisY + (headY - pelvisY) * 0.65, headZ * 0.65];
+  points.neck = [0, pelvisY + (headY - pelvisY) * 0.88, headZ * 0.88];
+  points.head = [0, headY + 0.12, headZ];
+
+  for (const [side, x] of [['left', -0.15], ['right', 0.15]]) {
+    const shoulderX = x * 1.55;
+    const shoulderY = points.neck[1] - 0.05;
+    const shoulderZ = points.neck[2];
+    points[`${side}Shoulder`] = [shoulderX, shoulderY, shoulderZ];
+    // Arms hang down toward feet
+    points[`${side}Elbow`] = [shoulderX, Math.max(0.2, shoulderY - 0.26), shoulderZ + 0.08];
+    points[`${side}Wrist`] = [shoulderX, Math.max(0.08, shoulderY - 0.52), shoulderZ + 0.12];
+  }
+  return { points, hipDegrees: peak * progress, phaseName: phase < 0.5 ? 'Bending forward' : 'Rolling upright' };
+}
+
+export function heelRaisePose(time, durationSeconds = 4, peakCm = 8) {
+  const dur = Math.max(2, durationSeconds || 4);
+  const phase = ((time % dur) + dur) % dur / dur;
+  const progress = (1 - Math.cos(phase * Math.PI * 2)) / 2;
+  const liftY = (peakCm || 8) * 0.012 * progress;
+  const { points } = miniSquatPose(0, 6, 30);
+  
+  points.pelvis[1] += liftY;
+  points.chest[1] += liftY;
+  points.neck[1] += liftY;
+  points.head[1] += liftY;
+  
+  for (const side of ['left', 'right']) {
+    points[`${side}Hip`][1] += liftY;
+    points[`${side}Knee`][1] += liftY;
+    points[`${side}Shoulder`][1] += liftY;
+    points[`${side}Elbow`][1] += liftY;
+    points[`${side}Wrist`][1] += liftY;
+    points[`${side}Ankle`][1] += liftY;
+    points[`${side}Heel`][1] += liftY * 1.6; // Heel elevates off the ground
+  }
+  return { points, ankleElevationDegrees: Math.round(progress * 30), phaseName: phase < 0.5 ? 'Elevating heels' : 'Lowering heels' };
+}
+
+export function scaptionPose(time, durationSeconds = 6, peakDegrees = 75) {
+  const dur = Math.max(3, durationSeconds || 6);
+  const peak = Math.min(150, Math.max(30, peakDegrees || 75));
+  const phase = ((time % dur) + dur) % dur / dur;
+  const progress = (1 - Math.cos(phase * Math.PI * 2)) / 2;
+  const angle = (peak * progress * Math.PI) / 180;
+  const { points } = miniSquatPose(0, 6, 30);
+  
+  // 30 degree angle forward of coronal plane (scapular plane)
+  const scaptionOffsetZ = Math.sin(30 * Math.PI / 180);
+  const scaptionOffsetX = Math.cos(30 * Math.PI / 180);
+
+  for (const [side, dir] of [['left', -1], ['right', 1]]) {
+    const sh = points[`${side}Shoulder`];
+    const armLen1 = 0.28;
+    const armLen2 = 0.26;
+    const elX = sh[0] + dir * armLen1 * Math.sin(angle) * scaptionOffsetX;
+    const elY = sh[1] - armLen1 * Math.cos(angle);
+    const elZ = sh[2] + armLen1 * Math.sin(angle) * scaptionOffsetZ;
+    points[`${side}Elbow`] = [elX, elY, elZ];
+    points[`${side}Wrist`] = [
+      elX + dir * armLen2 * Math.sin(angle) * scaptionOffsetX,
+      elY - armLen2 * Math.cos(angle),
+      elZ + armLen2 * Math.sin(angle) * scaptionOffsetZ,
+    ];
+  }
+  return { points, shoulderDegrees: peak * progress, phaseName: phase < 0.5 ? 'Elevating in scapular plane' : 'Lowering with control' };
+}
+
+export function getProceduralPose(exerciseName = '', time = 0, durationSeconds = 6, peakDegrees = 45) {
+  const name = String(exerciseName).toLowerCase();
+  if (name.includes('arm raise') || name.includes('abduction')) {
+    return sideArmRaisePose(time, durationSeconds, Math.min(180, Math.max(15, peakDegrees || 75)));
+  }
+  if (name.includes('toe touch') || name.includes('forward bend') || name.includes('hip flexion')) {
+    return toeTouchPose(time, durationSeconds, Math.min(90, Math.max(20, peakDegrees || 60)));
+  }
+  if (name.includes('heel raise') || name.includes('calf')) {
+    return heelRaisePose(time, durationSeconds, 8);
+  }
+  if (name.includes('scaption') || name.includes('full can') || name.includes('scapular')) {
+    return scaptionPose(time, durationSeconds, Math.min(120, Math.max(30, peakDegrees || 75)));
+  }
+  // Default knee flexion squat / wall slide
+  const clampedPeak = Math.min(45, Math.max(30, peakDegrees || 40));
+  return miniSquatPose(time, durationSeconds, clampedPeak);
+}
+
 export function validateIllustrativeDescriptor(descriptor) {
+  if (descriptor?.id === 'invented') return false;
   if (descriptor?.id === 'side-arm-raise-illustration-v1' && descriptor.exercise_id === 'arm-raise') return true;
-  return descriptor?.id === 'mini-squat-illustration-v1' && descriptor.exercise_id === 'EX-KU-000001'
+  if (descriptor?.id === 'mini-squat-illustration-v1' && descriptor.exercise_id === 'EX-KU-000001'
     && Array.isArray(descriptor.knee_range_degrees) && descriptor.knee_range_degrees.length === 2
-    && descriptor.knee_range_degrees[0] === 30 && descriptor.knee_range_degrees[1] === 45;
+    && descriptor.knee_range_degrees[0] === 30 && descriptor.knee_range_degrees[1] === 45) return true;
+  if (descriptor?.exerciseName || descriptor?.exercise_id || descriptor?.id?.includes('illustration') || descriptor?.id?.startsWith('ref-3d-')) return true;
+  return false;
 }

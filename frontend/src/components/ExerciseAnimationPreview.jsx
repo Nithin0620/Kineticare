@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { miniSquatPose, sideArmRaisePose, SKELETON_SEGMENTS, validateIllustrativeDescriptor } from '../exercise/illustrativeMotion';
+import { miniSquatPose, sideArmRaisePose, getProceduralPose, SKELETON_SEGMENTS, validateIllustrativeDescriptor } from '../exercise/illustrativeMotion';
 
 export default function ExerciseAnimationPreview({ descriptor, initialPeak, compact = false }) {
   const hostRef = useRef(null);
   const controlsRef = useRef(null);
-  const isArm = descriptor?.id === 'side-arm-raise-illustration-v1';
-  const title = isArm ? 'Side arm raise' : 'Mini-squat';
-  const [peak, setPeak] = useState(initialPeak ?? (isArm ? 75 : 30));
+  const exName = descriptor?.exerciseName || descriptor?.name || '';
+  const isArm = descriptor?.id === 'side-arm-raise-illustration-v1' || exName.toLowerCase().includes('arm') || exName.toLowerCase().includes('scaption');
+  const isToe = exName.toLowerCase().includes('toe') || exName.toLowerCase().includes('bend');
+  const isHeel = exName.toLowerCase().includes('heel') || exName.toLowerCase().includes('calf');
+  const title = exName || (isArm ? 'Side arm raise' : isToe ? 'Standing toe touch' : isHeel ? 'Heel raise' : 'Mini-squat');
+  const [peak, setPeak] = useState(initialPeak ?? (isArm ? 75 : isToe ? 60 : isHeel ? 8 : 30));
   const [poseStats, setPoseStats] = useState({ angle: 0, phase: 'Rest position' });
   const [duration, setDuration] = useState(6);
   const [view, setView] = useState(isArm ? 'front' : 'oblique');
@@ -29,7 +32,13 @@ export default function ExerciseAnimationPreview({ descriptor, initialPeak, comp
     let previous = null;
     let running = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     let statsAt = 0;
-    const getPose = isArm ? sideArmRaisePose : miniSquatPose;
+    const getPose = (time, dur, pk) => {
+      if (descriptor?.id === 'side-arm-raise-illustration-v1') return sideArmRaisePose(time, dur, pk);
+      if (descriptor?.id === 'mini-squat-illustration-v1' && descriptor?.exercise_id === 'EX-KU-000001') {
+        return miniSquatPose(time, dur, Math.min(45, Math.max(30, pk)));
+      }
+      return getProceduralPose(title, time, dur, pk);
+    };
     let recordingEnd = null;
     let recorder;
     let disposed = false;
@@ -109,7 +118,11 @@ export default function ExerciseAnimationPreview({ descriptor, initialPeak, comp
         }
         torso.position.set(0, pose.points.pelvis[1] + 0.32, pose.points.pelvis[2]);
         pelvisMesh.position.set(...pose.points.pelvis);
-        if (timestamp - statsAt > 120) { statsAt = timestamp; setPoseStats({ angle: Math.round(pose.shoulderDegrees ?? pose.kneeFlexionDegrees), phase: pose.phaseName }); }
+        if (timestamp - statsAt > 120) {
+          statsAt = timestamp;
+          const displayAngle = Math.round(pose.shoulderDegrees ?? pose.kneeFlexionDegrees ?? pose.hipDegrees ?? pose.ankleElevationDegrees ?? 0);
+          setPoseStats({ angle: displayAngle, phase: pose.phaseName });
+        }
         renderer.render(scene, camera);
         if (recorder?.state === 'recording') {
           painter.fillStyle = '#f1f5f9'; painter.fillRect(0, 0, 960, 600);
@@ -181,12 +194,12 @@ export default function ExerciseAnimationPreview({ descriptor, initialPeak, comp
     {!compact && <div className="row sp"><h3>{title} · movement preview</h3><span className="tag">Illustrative 3D</span></div>}
     <div className="motion-stage"><div ref={hostRef} className="motion-canvas" /><div className="motion-hud"><span>{poseStats.phase}</span><b>{poseStats.angle}° <small>/ {peak}°</small></b></div><span className="motion-view-label">{view} view · {duration}s cycle</span></div>
     <div className="motion-controls">
-      {!compact && <label>{isArm ? 'Preview arm height' : 'Preview knee flexion'}<select value={peak} disabled={recording} onChange={event => { setPeak(Number(event.target.value)); setPaused(window.matchMedia('(prefers-reduced-motion: reduce)').matches); }}>{(isArm ? [30, 45, 60, 75, 90, 120] : [30, 45]).map(value => <option key={value} value={value}>{value}°</option>)}</select></label>}
+      {!compact && <label>{isArm ? 'Preview arm height' : isToe ? 'Forward bend angle' : isHeel ? 'Heel elevation' : 'Preview knee flexion'}<select value={peak} disabled={recording} onChange={event => { setPeak(Number(event.target.value)); setPaused(window.matchMedia('(prefers-reduced-motion: reduce)').matches); }}>{(isArm ? [30, 45, 60, 75, 90, 120] : isToe ? [30, 45, 60, 75, 90] : isHeel ? [4, 6, 8, 10] : [30, 45]).map(value => <option key={value} value={value}>{value}°</option>)}</select></label>}
       <label>Tempo<select value={duration} disabled={recording} onChange={event => { setDuration(Number(event.target.value)); setPaused(window.matchMedia('(prefers-reduced-motion: reduce)').matches); }}><option value="3">3s cycle</option><option value="6">6s cycle</option><option value="12">12s cycle</option></select></label>
       <label>Camera angle<select value={view} disabled={recording} onChange={event => { setView(event.target.value); setPaused(window.matchMedia('(prefers-reduced-motion: reduce)').matches); }}><option value="front">Front</option><option value="oblique">3/4 view</option><option value="side">Side</option></select></label>
     </div>
     <div className="row"><button type="button" className="btn s" aria-pressed={paused} disabled={recording} onClick={() => { if (controlsRef.current) setPaused(controlsRef.current.toggle()); }}>{paused ? 'Play animation' : 'Pause animation'}</button>{!compact && <button type="button" className="btn" disabled={recording} onClick={exportVideo}>{recording ? 'Rendering one cycle…' : 'Export preview video'}</button>}</div>
-    <p className="mut">{isArm ? `Raise both arms out to ${peak}°, then lower fully to count one rep.` : '30–45° is the source-scoped demonstration range.'} Synthetic movement preview; follow your assigned range. {compact ? '' : 'Exporting a preview does not approve it for patient assignment.'}</p>
+    <p className="mut">{isArm ? `Raise both arms out to ${peak}°, then lower fully to count one rep.` : isToe ? `Hinge forward at hips to ${peak}°, then return upright to count one rep.` : isHeel ? 'Elevate heels smoothly on balls of feet, then lower.' : '30–45° is the source-scoped demonstration range.'} Synthetic movement preview; follow your assigned range.</p>
     {video && <div><video src={video.url} controls playsInline style={{ width: '100%', marginTop: 16 }} /><a className="btn s" href={video.url} download={`kineticare-${isArm ? 'arm-raise' : 'mini-squat'}-illustration.${video.extension}`}>Download preview video</a></div>}
     {error && <p role="alert">{error}</p>}
   </section>;

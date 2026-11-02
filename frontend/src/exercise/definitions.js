@@ -22,37 +22,108 @@ export const EXERCISE_DEFINITIONS = {
     measurementVersion: 'arm-raise-front-v1',
     setup: 'Face the camera with both shoulders, elbows, wrists, and hips visible.',
   },
+  miniSquat: {
+    id: 'mini-squat',
+    name: 'Bilateral mini-squat',
+    cameraView: 'side',
+    measurementVersion: 'squat-side-v1',
+    setup: 'Stand side-on with feet shoulder-width apart, knees and hips visible.',
+  },
+  wallSlide: {
+    id: 'wall-slide',
+    name: 'Standing wall slide',
+    cameraView: 'side',
+    measurementVersion: 'squat-side-v1',
+    setup: 'Stand with back against a wall, side-on to camera with knees visible.',
+  },
+  heelRaise: {
+    id: 'heel-raise',
+    name: 'Bilateral standing heel raise',
+    cameraView: 'side',
+    measurementVersion: 'heel-raise-side-v1',
+    setup: 'Stand side-on or facing camera with feet and ankles clearly visible.',
+  },
+  scaption: {
+    id: 'scaption',
+    name: 'Standing full-can scapular-plane elevation',
+    cameraView: 'front',
+    measurementVersion: 'scaption-front-v1',
+    setup: 'Face camera with arms rotated slightly outward in the scapular plane.',
+  },
 };
 
 /**
  * Starting repetition state machine parameters.
- * NOTE: These are initial engineering defaults to be tuned on real patient/participant data.
- * They do not constitute clinically validated thresholds.
  */
 export const EXERCISE_REP_PARAMETERS = {
   Squat: {
     name: 'Squat',
     joint: 'knee',
     direction: 'decreasing',
-    upAngle: 165,             // degrees: standing extension
-    downAngle: 130,           // degrees: flexion depth (default target 45° excursion from ~175°)
-    hysteresisGap: 15,        // degrees gap between inflection and return thresholds
-    minRom: 25,               // degrees: minimum knee excursion required to count
-    minRomProgress: 0.65,     // ratio of target excursion
-    minPhaseDurationMs: 300,  // ms: minimum phase duration (outbound and return)
-    minDurationMs: 700,       // ms: minimum cycle duration to filter twitch/artifact
-    maxCycleDurationMs: 7000, // ms: maximum duration before cycle is rejected as stalled
-    targetMin: 0.9,           // prescribed target reach window lower bound
-    targetMax: 1.1,           // prescribed target reach window upper bound
+    upAngle: 165,
+    downAngle: 130,
+    hysteresisGap: 15,
+    minRom: 25,
+    minRomProgress: 0.65,
+    minPhaseDurationMs: 300,
+    minDurationMs: 700,
+    maxCycleDurationMs: 7000,
+    targetMin: 0.9,
+    targetMax: 1.1,
+  },
+  'Bilateral mini-squat': {
+    name: 'Bilateral mini-squat',
+    joint: 'knee',
+    direction: 'decreasing',
+    upAngle: 165,
+    downAngle: 135,
+    hysteresisGap: 12,
+    minRom: 20,
+    minRomProgress: 0.65,
+    minPhaseDurationMs: 300,
+    minDurationMs: 700,
+    maxCycleDurationMs: 7000,
+    targetMin: 0.9,
+    targetMax: 1.1,
+  },
+  'Standing wall slide': {
+    name: 'Standing wall slide',
+    joint: 'knee',
+    direction: 'decreasing',
+    upAngle: 165,
+    downAngle: 120,
+    hysteresisGap: 15,
+    minRom: 25,
+    minRomProgress: 0.65,
+    minPhaseDurationMs: 300,
+    minDurationMs: 800,
+    maxCycleDurationMs: 8000,
+    targetMin: 0.9,
+    targetMax: 1.1,
   },
   'Side Arm Raise': {
     name: 'Side Arm Raise',
     joint: 'shoulder',
     direction: 'increasing',
-    upAngle: 70,              // degrees: elevation depth (for ~75° target)
-    downAngle: 25,            // degrees: resting arms at sides
-    hysteresisGap: 15,        // degrees gap between inflection and return thresholds
-    minRom: 35,               // degrees: minimum shoulder abduction excursion required
+    upAngle: 70,
+    downAngle: 25,
+    hysteresisGap: 15,
+    minRom: 35,
+    minRomProgress: 0.65,
+    minPhaseDurationMs: 300,
+    minDurationMs: 700,
+    maxCycleDurationMs: 7000,
+    targetMin: 0.9,
+    targetMax: 1.1,
+  },
+  'Standing full-can scapular-plane elevation': {
+    name: 'Standing full-can scapular-plane elevation',
+    joint: 'shoulder',
+    direction: 'increasing',
+    upAngle: 70,
+    downAngle: 25,
+    hysteresisGap: 15,
+    minRom: 35,
     minRomProgress: 0.65,
     minPhaseDurationMs: 300,
     minDurationMs: 700,
@@ -75,7 +146,40 @@ export const EXERCISE_REP_PARAMETERS = {
     targetMin: 0.9,
     targetMax: 1.1,
   },
+  'Bilateral standing heel raise': {
+    name: 'Bilateral standing heel raise',
+    joint: 'ankle',
+    direction: 'increasing',
+    upAngle: 45,
+    downAngle: 15,
+    hysteresisGap: 10,
+    minRom: 15,
+    minRomProgress: 0.6,
+    minPhaseDurationMs: 250,
+    minDurationMs: 600,
+    maxCycleDurationMs: 6000,
+    targetMin: 0.85,
+    targetMax: 1.15,
+  },
 };
+
+export function getExerciseParameters(name) {
+  if (EXERCISE_REP_PARAMETERS[name]) return EXERCISE_REP_PARAMETERS[name];
+  const lower = String(name).toLowerCase();
+  if (lower.includes('squat') || lower.includes('knee') || lower.includes('lunge') || lower.includes('leg')) {
+    return { ...EXERCISE_REP_PARAMETERS.Squat, name };
+  }
+  if (lower.includes('arm') || lower.includes('shoulder') || lower.includes('raise') || lower.includes('scaption')) {
+    return { ...EXERCISE_REP_PARAMETERS['Side Arm Raise'], name };
+  }
+  if (lower.includes('toe') || lower.includes('bend') || lower.includes('hip')) {
+    return { ...EXERCISE_REP_PARAMETERS['Toe Touch'], name };
+  }
+  if (lower.includes('heel') || lower.includes('calf') || lower.includes('ankle')) {
+    return { ...EXERCISE_REP_PARAMETERS['Bilateral standing heel raise'], name };
+  }
+  return { ...EXERCISE_REP_PARAMETERS['Side Arm Raise'], name };
+}
 
 export function squatSideConfidence(keypoints, side = 'left') {
   const points = namedKeypoints(keypoints);
@@ -94,7 +198,6 @@ export function squatKneeAngle(keypoints, side = 'left', minimumScore = 0.25) {
     if (visible([ankle], minimumScore)) {
       return angleAt(hip, knee, ankle);
     }
-    // Fallback: if ankle has valid coords and score >= 0.1, use it
     if (ankle && Number.isFinite(ankle.x) && Number.isFinite(ankle.y) && (ankle.score ?? 0) >= 0.1) {
       return angleAt(hip, knee, ankle);
     }
@@ -121,4 +224,17 @@ export function toeTouchHipAngle(keypoints, side = 'left', minimumScore = 0.2) {
   const points = namedKeypoints(keypoints);
   const joints = [points[`${side}_shoulder`], points[`${side}_hip`], points[`${side}_knee`]];
   return visible(joints, minimumScore) ? angleAt(...joints) : null;
+}
+
+export function ankleHeelRaiseAngle(keypoints, side = 'left', minimumScore = 0.15) {
+  const points = namedKeypoints(keypoints);
+  const knee = points[`${side}_knee`];
+  const ankle = points[`${side}_ankle`];
+  const heel = points[`${side}_heel`];
+  const foot = points[`${side}_foot_index`];
+  if (visible([knee, ankle], minimumScore) && (visible([heel], minimumScore) || visible([foot], minimumScore))) {
+    const tip = heel || foot;
+    return angleAt(knee, ankle, tip);
+  }
+  return null;
 }

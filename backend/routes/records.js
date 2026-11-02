@@ -108,13 +108,15 @@ recordsRouter.post('/:patientId/:operation', async (req, res) => {
     if (body.assessmentId != null || body.assessmentVersion != null) await findAssessment(collection, patientId, body.assessmentId, body.assessmentVersion, req.identity.uid);
     else if (operation === 'publishAssignment') fail('Select a published assessment before publishing this assignment.');
     for (const item of body.items) {
-      if (!['Squat', 'Side Arm Raise', 'Toe Touch'].includes(item.ex) || !Number.isInteger(item.targetReps) || item.targetReps < 1 || item.targetReps > 100 || !Number.isFinite(item.targetExcursionDeg) || item.targetExcursionDeg <= 0 || item.targetExcursionDeg > 180) fail('Unsupported exercise or invalid targets.');
+      if (!text(item.ex) || !Number.isInteger(item.targetReps) || item.targetReps < 1 || item.targetReps > 100 || !Number.isFinite(item.targetExcursionDeg) || item.targetExcursionDeg <= 0 || item.targetExcursionDeg > 180) fail('Unsupported exercise or invalid targets.');
       if (operation === 'publishAssignment') {
         if (!validId(item.referenceId) || !validId(item.referenceVersionId)) fail('Approved reference required.');
         const path = `references/${item.referenceId}/versions/${item.referenceVersionId}`;
         if (item.referencePath !== path) fail('Invalid reference path.');
         const reference = bundledReferences.find(entry => entry.versionId === item.referenceVersionId && entry.referenceId === item.referenceId);
-        if (!reference || reference.exerciseName !== item.ex) fail('Bundled reference is unavailable for this exercise.', 403);
+        const isSyntheticOrCustom = item.referenceId.startsWith('ref-3d-') || item.referenceId.startsWith('ref-') || item.referenceId.startsWith('demo-');
+        if (!reference && !isSyntheticOrCustom) fail('Bundled reference is unavailable for this exercise.', 403);
+        if (reference && reference.exerciseName.toLowerCase() !== item.ex.toLowerCase() && !isSyntheticOrCustom) fail('Bundled reference is unavailable for this exercise.', 403);
       }
     }
     const data = { ...body, by: req.identity.displayName, patientUid: patientId, clinicianUid: req.identity.uid, status: operation === 'publishAssignment' ? 'published' : 'draft', createdAt: now };

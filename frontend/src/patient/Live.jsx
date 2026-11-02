@@ -193,8 +193,10 @@ function LiveSession({ state, exIdx, plan, exercise, patientId }) {
         setCalibration({ status: 'error', progress: 0, message: result.reason });
         return;
       }
-      if ((exercise.ex === 'Side Arm Raise' && result.value > 35) || (exercise.ex !== 'Side Arm Raise' && result.value < 145)) {
-        setCalibration({ status: 'error', progress: 0, message: exercise.ex === 'Side Arm Raise' ? 'Lower both arms to your sides, then retry setup.' : 'Stand upright and still, then retry setup.' });
+      const config = repConfig(exercise.ex, 0, exercise.targetExcursionDeg);
+      const isIncreasing = config.direction === 'increasing';
+      if ((isIncreasing && result.value > 45) || (!isIncreasing && result.value < 135)) {
+        setCalibration({ status: 'error', progress: 0, message: isIncreasing ? 'Lower arms or heels to starting position, then retry setup.' : 'Stand upright and still, then retry setup.' });
         return;
       }
       restRef.current = result.value;
