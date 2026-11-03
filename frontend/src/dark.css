@@ -7,11 +7,11 @@
 .login-page { position: relative; }
 .login-theme { position: absolute; top: 0; right: 32px; z-index: 2; }
 :root[data-theme=dark] {
-  --bg: #16151b; --card: #211f28; --soft: #2b2833; --card-border: #37333f;
-  --ink: #f2eff7; --ink-secondary: #cbc5d5; --mut: #aaa2b7;
-  --pri: #ad9dff; --pri-dark: #9380f2; --pri-light: #c4b8ff; --pri2: #39304f;
-  --ok: #9bdd95; --okb: #253a2a; --warn: #edc18a; --warnb: #403222;
-  --bad: #ef898d; --badb: #45272e;
+  --bg: #141318; --card: #1e1c24; --soft: #25232d; --card-border: #2d2a36;
+  --ink: #f4f4f5; --ink-secondary: #a1a1aa; --mut: #71717a;
+  --pri: #2dd4bf; --pri-dark: #14b8a6; --pri-light: #5eead4; --pri2: #042f2e;
+  --ok: #4ade80; --okb: #14532d; --warn: #fbbf24; --warnb: #451a03;
+  --bad: #f87171; --badb: #450a0a;
 }
 [data-theme=dark] .btn { background: #eeeaf5; color: #211f28; border-color: transparent; }
 [data-theme=dark] .btn:hover:not(:disabled) { background: #d7cfe8; }

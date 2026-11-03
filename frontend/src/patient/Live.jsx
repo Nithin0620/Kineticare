@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useRecords } from '../records/recordsContext';
 import { exerciseMeta, measureAngle, calibratedProgress, repConfig } from '../exercise/measure';
 import ReferenceVideo from '../components/ReferenceVideo';
-import SideArmRaiseDemo from '../components/SideArmRaiseDemo';
+import ExerciseDemoPlayer from '../components/ExerciseDemoPlayer';
 import PreSessionChecklist from '../components/PreSessionChecklist';
 import { advanceRep, createRepState } from '../exercise/engine';
 import { calibrateRest } from '../exercise/reference';
@@ -12,7 +12,7 @@ import usePoseCamera from '../vision/usePoseCamera';
 import { getPoseFilterConfig } from '../vision/oneEuroFilter';
 import { POSE_MODES, shoulderAngles } from '../vision/poseOverlay';
 import { smoothAngleEMA, checkBodyAlignment } from '../vision/geometry';
-import { validatePreSession, measureTorsoLength, checkPatientDistance, MIN_OPTIMAL_DISTANCE_M, MAX_OPTIMAL_DISTANCE_M } from '../vision/sessionValidation';
+import { validatePreSession, measureTorsoLength, checkPatientDistance } from '../vision/sessionValidation';
 import { saveSessionDraft } from '../session/drafts';
 import { startProfiler } from '../session/profiler';
 
@@ -47,7 +47,198 @@ export default function PatientLive() {
   const plan = patientPlan(patientId);
   if (!plan?.items[exIdx]) return <div className="card">The assigned exercise is unavailable. Return to your plan.</div>;
   if (state?.assignmentVersion != null && state.assignmentVersion !== plan.v) return <div className="card">Your clinician updated this plan. <button className="btn" onClick={() => nav('/patient/workout')}>Open current workout</button></div>;
-  return <LiveSession key={exIdx} state={state} exIdx={exIdx} plan={plan} exercise={plan.items[exIdx]} patientId={patientId} />;
+
+  const exercise = plan.items[exIdx];
+  const meta = exerciseMeta(exercise.ex);
+  if (exercise.videoOnly || meta.isUnmeasured) {
+    return <GuidedLiveSession key={exIdx} state={state} exIdx={exIdx} plan={plan} exercise={exercise} patientId={patientId} />;
+  }
+
+  return <LiveSession key={exIdx} state={state} exIdx={exIdx} plan={plan} exercise={exercise} patientId={patientId} />;
+}
+
+function GuidedLiveSession({ state, exIdx, plan, exercise, patientId }) {
+  const nav = useNavigate();
+  const { workspace } = useRecords();
+  const reference = workspace.references?.find(item => item.versionId === exercise.referenceVersionId);
+  const [guidedReps, setGuidedReps] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const completedRef = useRef(state?.done || []);
+
+  useEffect(() => {
+    if (paused) return;
+    const interval = setInterval(() => {
+      setElapsed(e => e + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [paused]);
+
+  const speak = useCallback(text => {
+    if (!('speechSynthesis' in window)) return;
+    speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.95;
+    speechSynthesis.speak(utterance);
+  }, []);
+
+  const finish = useCallback(result => {
+    speak('Exercise complete.');
+    const completed = [...completedRef.current, result];
+    saveSessionDraft(patientId, { ...state, exIdx, done: completed, sessionId: state?.sessionId });
+    const nextIdx = plan.items.findIndex((item, index) => index > exIdx);
+    if (state?.all && nextIdx !== -1 && result.completion !== 'partial') {
+      nav('/patient/live', { state: { ...state, exIdx: nextIdx, done: completed, all: true } });
+    } else {
+      nav('/patient/sum', { state: { ...state, done: completed } });
+    }
+  }, [state, exIdx, plan.items, nav, patientId, speak]);
+
+  const addRep = () => {
+    const next = guidedReps + 1;
+    setGuidedReps(next);
+    speak(`${ORDINAL[next] ?? next} repetition complete.`);
+  };
+
+  const handleFinish = (completion = 'completed') => {
+    const targetReps = exercise.targetReps || 5;
+    const isCompleted = completion === 'completed' && guidedReps >= targetReps;
+    finish({
+      ex: exercise.ex,
+      t: elapsed,
+      elapsedMs: elapsed * 1000,
+      activeMs: elapsed * 1000,
+      pausedMs: 0,
+      unassessedMs: 0,
+      readyRestMs: 0,
+      trackingCoverage: null,
+      baseline: null,
+      s: 1.0,
+      movementScore: 100,
+      scoreComponents: { rom: 100, tempo: 100, stability: 100 },
+      formulaVersion: 1,
+      reps: Array.from({ length: guidedReps }).map(() => ({
+        peak: 1.0,
+        durationMs: 3500,
+        outboundMs: 1500,
+        returnMs: 2000,
+        eccentricRatio: 1.33,
+        peakDeg: 0,
+        withinTarget: true,
+        score: 100,
+      })),
+      targetExcursionDeg: 0,
+      targetReps,
+      attemptedReps: guidedReps,
+      assessedReps: guidedReps,
+      withinTargetReps: guidedReps,
+      completion: isCompleted ? 'completed' : 'partial',
+      mode: 'guided',
+      c: 'Guided rehabilitation protocol completed',
+    });
+  };
+
+  return (
+    <div className="guided-session-container">
+      <div className="row sp" style={{ alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+        <h2 style={{ margin: 0 }}>{exercise.ex}</h2>
+        <div className="row" style={{ gap: 6, alignItems: 'center' }}>
+          {plan?.items?.map((item, idx) => (
+            <button
+              key={idx}
+              type="button"
+              className={`btn s sm ${idx === exIdx ? 'pri' : ''}`}
+              style={{ padding: '4px 10px', fontSize: 12, fontWeight: idx === exIdx ? 700 : 400 }}
+              onClick={() => {
+                if (idx !== exIdx) {
+                  nav('/patient/live', { state: { ...state, exIdx: idx } });
+                }
+              }}
+            >
+              {item.ex}
+            </button>
+          ))}
+          <span className="tag">Guided · {exercise.targetReps} reps target</span>
+        </div>
+      </div>
+
+      <div className="card" style={{ borderLeft: '4px solid var(--pri)' }}>
+        <div className="row sp" style={{ marginBottom: 6 }}>
+          <b>Guided Movement Instructions</b>
+          <span className="tag ok">Self-Paced</span>
+        </div>
+        <p className="mut" style={{ margin: 0, fontSize: 13 }}>
+          Move slowly and intentionally. Focus on comfortable form within your pain-free range.
+        </p>
+        {exercise.note && (
+          <p style={{ marginTop: 8, marginBottom: 0, fontStyle: 'italic', color: 'var(--ink)' }}>
+            <b>Clinician prescription cue:</b> {exercise.note}
+          </p>
+        )}
+      </div>
+
+      <div className="card" style={{ padding: 0, overflow: 'hidden', margin: '14px 0' }}>
+        {reference ? (
+          <div className="vid"><ReferenceVideo mediaPath={reference.mediaPath} /></div>
+        ) : (
+          <ExerciseDemoPlayer exerciseName={exercise.ex} targetReps={exercise.targetReps} />
+        )}
+      </div>
+
+      <div className="card" style={{ textAlign: 'center', padding: '20px 16px' }}>
+        <div className="row sp" style={{ justifyContent: 'center', gap: 32, marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: 32, fontWeight: 700, color: 'var(--pri)' }}>{guidedReps} / {exercise.targetReps}</div>
+            <span className="mut" style={{ fontSize: 12 }}>Reps Logged</span>
+          </div>
+          <div>
+            <div style={{ fontSize: 32, fontWeight: 700 }}>{elapsed}s</div>
+            <span className="mut" style={{ fontSize: 12 }}>Time Elapsed</span>
+          </div>
+        </div>
+
+        <div className="row" style={{ justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <button className="btn" style={{ padding: '10px 24px', fontSize: 15 }} onClick={addRep}>
+            ✓ Log Repetition ({guidedReps + 1})
+          </button>
+          {guidedReps > 0 && (
+            <button className="btn s" onClick={() => setGuidedReps(r => Math.max(0, r - 1))}>
+              Undo Rep
+            </button>
+          )}
+          <button className="btn s" onClick={() => setPaused(p => !p)}>
+            {paused ? 'Resume Timer' : 'Pause'}
+          </button>
+        </div>
+
+        {guidedReps >= (exercise.targetReps || 1) && (
+          <p className="tag ok" role="status" style={{ marginTop: 14 }}>
+            ✓ Assigned repetitions reached. Finish when ready!
+          </p>
+        )}
+      </div>
+
+      <div className="row session-actions" style={{ marginTop: 16 }}>
+        <button
+          className="btn"
+          disabled={guidedReps === 0 && elapsed < 5}
+          onClick={() => handleFinish('completed')}
+        >
+          Finish Guided Exercise
+        </button>
+        <button
+          className="btn s"
+          onClick={() => {
+            if (guidedReps > 0 && !confirm('Stop and save this exercise as partial?')) return;
+            if (guidedReps > 0) handleFinish('partial');
+            else nav('/patient/workout');
+          }}
+        >
+          {guidedReps > 0 ? 'Stop & Save Partial' : 'Back to Workout'}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function LiveSession({ state, exIdx, plan, exercise, patientId }) {
@@ -276,7 +467,7 @@ function LiveSession({ state, exIdx, plan, exercise, patientId }) {
     speak('Exercise complete.', true);
     const completed = [...completedRef.current, result];
     saveSessionDraft(patientId, { ...state, exIdx, done: completed, sessionId: state?.sessionId });
-    const nextIdx = plan.items.findIndex((item, index) => index > exIdx && !item.videoOnly);
+    const nextIdx = plan.items.findIndex((item, index) => index > exIdx);
     if (state?.all && nextIdx !== -1 && result.completion !== 'partial') {
       nav('/patient/live', { state: { ...state, exIdx: nextIdx, done: completed, all: true } });
     } else {
@@ -306,7 +497,7 @@ function LiveSession({ state, exIdx, plan, exercise, patientId }) {
       }
     }, 100);
     return () => clearInterval(id);
-  }, [mode, paused, replayTrackingLost, speak]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode, paused, replayTrackingLost, speak]);
 
   const replayDone = mode === 'replay' && timing.active >= replayDuration;
   useEffect(() => {
@@ -321,22 +512,28 @@ function LiveSession({ state, exIdx, plan, exercise, patientId }) {
         torsoLength: torsoLengthRef.current,
         distanceMeters: distanceRef.current,
       },
-      s: score ? score.score / 100 : null, movementScore: score?.score ?? null,
-      scoreComponents: score?.components ?? null, formulaVersion: score?.formulaVersion ?? null,
-      targetExcursionDeg: exercise.targetExcursionDeg,
-      targetReps: exercise.targetReps,
+      s: score ? score.score / 100 : null,
+      movementScore: score?.score ?? null,
+      scoreComponents: score?.components ?? null,
+      formulaVersion: score?.formulaVersion ?? null,
       reps: reps.map(rep => ({
         peak: +rep.peak.toFixed(2),
         durationMs: Math.round(rep.durationMs),
-        outboundMs: rep.outboundMs || Math.round(rep.durationMs * 0.44),
-        returnMs: rep.returnMs || Math.round(rep.durationMs * 0.56),
-        eccentricRatio: rep.eccentricRatio || 1.27,
+        outboundMs: rep.outboundMs || Math.round(rep.durationMs * 0.45),
+        returnMs: rep.returnMs || Math.round(rep.durationMs * 0.55),
+        eccentricRatio: rep.eccentricRatio || 1.2,
         peakDeg: Math.round(rep.peak * exercise.targetExcursionDeg),
         withinTarget: rep.withinTarget,
         score: scoreRep(rep).score,
       })),
-      attemptedReps: repRef.current.attemptedReps, assessedReps: repRef.current.assessedReps, withinTargetReps: repRef.current.withinTargetReps,
-      completion: 'completed', c: 'Replay demo (simulated)',
+      targetExcursionDeg: exercise.targetExcursionDeg,
+      targetReps: exercise.targetReps,
+      attemptedReps: repRef.current.attemptedReps,
+      assessedReps: repRef.current.assessedReps,
+      withinTargetReps: repRef.current.withinTargetReps,
+      completion: repRef.current.assessedReps >= exercise.targetReps ? 'completed' : 'partial',
+      mode: 'replay',
+      c: 'Replay demo',
     });
   }, [replayDone]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -442,10 +639,17 @@ function LiveSession({ state, exIdx, plan, exercise, patientId }) {
   const liveScore = scoreRepetitions(repState.reps);
   const lastRep = repState.reps.at(-1);
 
-  const cameraLabel = calibration.status === 'collecting'
-    ? 'Calibrating'
-    : !trackingUsable ? 'Reposition'
-      : cameraReady ? 'Tracking movement' : 'Ready to calibrate';
+  const cameraLabel = cameraStatus === 'loading-model'
+    ? 'Model loading…'
+    : cameraStatus === 'requesting'
+      ? 'Camera initializing…'
+      : calibration.status === 'collecting'
+        ? `Calibrating (${calibration.progress}%)`
+        : !trackingUsable
+          ? (calibration.status === 'ready' ? 'Tracking lost — reposition' : 'Positioning: Joint visibility check')
+          : cameraReady
+            ? (repState.attemptedReps >= exercise.targetReps ? 'Target reps reached' : 'Tracking active')
+            : 'Camera ready — hold posture';
 
   return (
     <>
@@ -454,35 +658,86 @@ function LiveSession({ state, exIdx, plan, exercise, patientId }) {
           💡 <b>Opening in WhatsApp?</b> For optimal camera access and tracking performance, tap <b>⋮</b> or <b>•••</b> in the top corner and select <b>"Open in Chrome"</b> or <b>"Open in Safari"</b>.
         </div>
       )}
-      <div className="row sp" style={{ alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-        <h2 style={{ margin: 0 }}>{exercise.ex}</h2>
-        <div className="row" style={{ gap: 6, alignItems: 'center' }}>
-          {plan?.items?.map((item, idx) => (
-            <button
-              key={idx}
-              type="button"
-              className={`btn s sm ${idx === exIdx ? 'pri' : ''}`}
-              style={{ padding: '4px 10px', fontSize: 12, fontWeight: idx === exIdx ? 700 : 400 }}
-              onClick={() => {
-                if (idx !== exIdx) {
-                  stopPoseCamera();
-                  nav('/patient/live', { state: { ...state, exIdx: idx } });
-                }
-              }}
-            >
-              {item.ex}
-            </button>
-          ))}
-          <span className="tag">{exercise.targetReps} reps · {exercise.targetExcursionDeg}° target</span>
+      <div className="live-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
+        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>{exercise.ex}</h2>
+        <div className="live-exercise-tabs" style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', background: 'var(--soft)', padding: '3px 4px', borderRadius: 9999, border: '1px solid var(--card-border)' }}>
+          {plan?.items?.map((item, idx) => {
+            const isSelected = idx === exIdx;
+            return (
+              <button
+                key={idx}
+                type="button"
+                style={{
+                  padding: '6px 15px',
+                  fontSize: 12.5,
+                  fontWeight: isSelected ? 600 : 500,
+                  borderRadius: 9999,
+                  minHeight: 30,
+                  whiteSpace: 'nowrap',
+                  cursor: 'pointer',
+                  border: 'none',
+                  background: isSelected ? 'var(--pri)' : 'transparent',
+                  color: isSelected ? '#ffffff' : 'var(--ink)',
+                  boxShadow: isSelected ? '0 1px 4px rgba(13, 148, 136, 0.3)' : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+                onClick={() => {
+                  if (idx !== exIdx) {
+                    stopPoseCamera();
+                    nav('/patient/live', { state: { ...state, exIdx: idx } });
+                  }
+                }}
+              >
+                {item.ex}
+              </button>
+            );
+          })}
+          <span style={{ whiteSpace: 'nowrap', fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 9999, background: 'var(--card)', color: 'var(--ink)', border: '1px solid var(--card-border)', marginLeft: 2 }}>
+            {exercise.targetReps} reps · {exercise.targetExcursionDeg}° target
+          </span>
         </div>
       </div>
-      <p className="mut">{!mode ? '1. Preview the movement. 2. Start exercise below. 3. Hold still for camera setup.' : calibration.status === 'ready' ? 'Move slowly, then return fully to your resting position to count each rep.' : mode === 'replay' ? 'Practice preview — these repetitions are simulated.' : 'Wait for “Tracking movement” before starting your reps.'}</p>
-      {exercise.ex === 'Side Arm Raise' && !mode && <SideArmRaiseDemo target={exercise.targetExcursionDeg} />}
-      {reference && !mode && <div className="card session-demo"><h3>Movement demonstration</h3><ReferenceVideo mediaPath={reference.mediaPath} /><p className="mut">{meta.setup} Start below when you are ready.</p></div>}
-      {(!mode || cameraStatus === 'error') && <label className="tracking-select">Tracking detail<select value={poseMode} onChange={event => setPoseMode(event.target.value)}>{Object.entries(POSE_MODES).map(([key, option]) => <option key={key} value={key}>{option.label}</option>)}</select><span className="mut">Choose Balanced or Fast if your phone struggles. Retrying keeps completed repetitions; camera setup runs again.</span></label>}
+      <p className="mut">{!mode ? '1. Preview the movement. 2. Start exercise below. 3. Hold still for camera setup.' : calibration.status === 'ready' ? 'Move slowly, then return fully to your resting position to count each rep.' : mode === 'replay' ? 'Practice preview — these repetitions are simulated.' : 'Wait for “Tracking active” before starting your reps.'}</p>
+      {!mode && (
+        reference && !reference.demo && !reference.mediaPath?.startsWith('demo:')
+          ? <div className="card session-demo" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ padding: '12px 16px', background: 'var(--soft)', borderBottom: '1px solid var(--card-border)' }}>
+                <b style={{ fontSize: 14 }}>Movement Reference</b>
+                <span className="mut" style={{ fontSize: 12, marginLeft: 8 }}>Clinician demonstration</span>
+              </div>
+              <div className="vid"><ReferenceVideo mediaPath={reference.mediaPath} /></div>
+              {meta.setup && <p className="mut" style={{ padding: '8px 16px', margin: 0, fontSize: 13 }}>{meta.setup}</p>}
+            </div>
+          : <ExerciseDemoPlayer
+              exerciseName={exercise.ex}
+              targetExcursionDeg={exercise.targetExcursionDeg}
+              targetReps={exercise.targetReps}
+              autoPlay={true}
+              showControls={true}
+            />
+      )}
+      {(!mode || cameraStatus === 'error') && (
+        <label className="tracking-select">
+          Tracking detail
+          <select value={poseMode} onChange={event => setPoseMode(event.target.value)}>
+            {Object.entries(POSE_MODES).map(([key, option]) => <option key={key} value={key}>{option.label}</option>)}
+          </select>
+          <span className="mut">Choose Balanced or Fast if your phone struggles. Retrying keeps completed repetitions; camera setup runs again.</span>
+        </label>
+      )}
       {mode === 'camera' && cameraStatus === 'loading-model' && <p className="session-status" role="status">Loading {POSE_MODES[poseMode].label.toLowerCase()} tracking. The first start downloads the model and needs an internet connection.</p>}
       {mode === 'replay' && <div className="demo">Replay demo: movement and score are simulated.</div>}
-      {mode === 'camera' && cameraStatus === 'running' && (
+      {mode === 'camera' && cameraStatus === 'running' && calibration.status !== 'ready' && (
+        <PreSessionChecklist
+          validation={validation}
+          calibrationStatus={calibration.status}
+          calibrationProgress={calibration.progress}
+          calibrationMessage={calibration.message}
+          onRetryCalibration={startCalibration}
+          canCalibrate={trackingUsable}
+        />
+      )}
+      {mode === 'camera' && cameraStatus === 'running' && calibration.status === 'ready' && (
         <div className="tracking-panel" aria-label="Tracking quality">
           <div><b>{tracking.visible}/{tracking.total || 33}</b><span>Landmarks visible</span></div>
           <div><b>{tracking.confidence}%</b><span>Detection confidence</span></div>
@@ -494,16 +749,6 @@ function LiveSession({ state, exIdx, plan, exercise, patientId }) {
           <p><span className="tracking-dot left" />Your left side <span className="tracking-dot right" />Your right side · {tracking.model}</p>
         </div>
       )}
-      {mode === 'camera' && cameraStatus === 'running' && calibration.status !== 'ready' && (
-        <PreSessionChecklist
-          validation={validation}
-          calibrationStatus={calibration.status}
-          calibrationProgress={calibration.progress}
-          calibrationMessage={calibration.message}
-          onRetryCalibration={startCalibration}
-          canCalibrate={trackingUsable}
-        />
-      )}
       <div className="live-monitor" hidden={!mode}>
       <div className={`cam${paused || !active ? ' paused' : ''}`} aria-label={mode === 'camera' ? 'Live camera with pose overlay' : 'Exercise preview'}>
         <video ref={videoRef} className="pose-layer" style={{ visibility: viewMode === 'skeleton' ? 'hidden' : 'visible', transform: facingMode === 'environment' ? 'none' : 'scaleX(-1)' }} autoPlay playsInline webkit-playsinline="true" muted />
@@ -511,7 +756,7 @@ function LiveSession({ state, exIdx, plan, exercise, patientId }) {
         {mode !== 'camera' && <Skeleton paused={paused || replayTrackingLost || !mode} />}
         <span className={`tag ${active ? 'ok' : 'warn'} st`}>
           {mode === 'camera'
-            ? cameraStatus === 'running' ? cameraLabel : cameraStatus.replace('-', ' ')
+            ? cameraStatus === 'running' ? cameraLabel : cameraStatus === 'error' ? 'Camera unavailable' : cameraStatus.replace('-', ' ')
             : mode === 'replay' ? replayTrackingLost ? 'Tracking unavailable' : 'Replay tracking' : 'Camera not started'}
         </span>
         {mode === 'camera' && cameraStatus === 'running' && (
@@ -535,12 +780,49 @@ function LiveSession({ state, exIdx, plan, exercise, patientId }) {
             🔄 {facingMode === 'user' ? 'Back cam' : 'Front cam'}
           </button>
         )}
+        {mode === 'camera' && cameraStatus === 'error' && (
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+            textAlign: 'center',
+            background: 'rgba(12, 13, 18, 0.94)',
+            color: '#fff',
+            zIndex: 10,
+          }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>📷</div>
+            <b style={{ fontSize: 16, marginBottom: 6 }}>Camera Setup Required</b>
+            <p className="mut" style={{ color: '#94a3b8', maxWidth: 360, fontSize: 13, margin: '0 0 16px', lineHeight: 1.5 }}>
+              {cameraError || 'Please allow webcam access in your browser, or switch to simulated demo to practice immediately without camera.'}
+            </p>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button className="btn session-primary" onClick={startCamera}>
+                🔄 Retry camera setup
+              </button>
+              <button className="btn s" style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.1)' }} onClick={() => setMode('replay')}>
+                ▶ Switch to simulated demo
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+      <p className="mut" style={{ fontSize: 11, textAlign: 'center', margin: '6px 0 0' }}>
+        ℹ️ Estimates only: Joint excursion angles are computed locally for rehabilitation guidance and do not constitute diagnostic measurements.
+      </p>
 
       </div>
       {alignmentIssue && mode === 'camera' && (
         <div className="demo" role="alert" style={{ background: 'var(--warnb)', color: 'var(--warn)', borderColor: 'rgba(180,83,9,0.3)', display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
           <span>⚠️ <b>Orientation Check:</b> {alignmentIssue}</span>
+        </div>
+      )}
+      {distanceIssue && mode === 'camera' && (
+        <div className="demo" role="alert" style={{ background: 'var(--warnb)', color: 'var(--warn)', borderColor: 'rgba(180,83,9,0.3)', display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+          <span>ℹ️ <b>Distance:</b> {distanceIssue}</span>
         </div>
       )}
       
@@ -551,7 +833,7 @@ function LiveSession({ state, exIdx, plan, exercise, patientId }) {
         </div>
         <div className="row sp mut" style={{ fontSize: 12, marginTop: 2 }}><span>0%</span><span>50%</span><span>100%</span></div>
         <h2 style={{ textAlign: 'center', margin: '4px 0 0' }}>{exercise.ex}</h2>
-        <p className="mut" style={{ textAlign: 'center', margin: 0 }}>{state?.all ? `${plan.items.slice(0, exIdx + 1).filter(item => !item.videoOnly).length} of ${plan.items.filter(item => !item.videoOnly).length}` : 'Single exercise'} · target {exercise.targetExcursionDeg}° × {exercise.targetReps} reps</p>
+        <p className="mut" style={{ textAlign: 'center', margin: 0 }}>{state?.all ? `${plan.items.slice(0, exIdx + 1).length} of ${plan.items.length}` : 'Single exercise'} · target {exercise.targetExcursionDeg}° × {exercise.targetReps} reps</p>
       </div>
 
       {reference && mode && (
@@ -560,7 +842,7 @@ function LiveSession({ state, exIdx, plan, exercise, patientId }) {
           {showDemo && <div className="vid" style={{ marginTop: 10, maxWidth: 220 }}><ReferenceVideo mediaPath={reference.mediaPath} loop autoPlay controls={false} /></div>}
         </div>
       )}
-      {exercise.ex === 'Side Arm Raise' && mode && <details className="card"><summary>Show arm raise animation</summary><SideArmRaiseDemo target={exercise.targetExcursionDeg} /></details>}
+      {/* animation preview only shown before session starts */}
       {cameraError && <div className="demo" role="alert" style={{ marginTop: 12 }}>{cameraError}</div>}
       {mode === 'replay' && replayTrackingLost && <div className="demo" role="alert" style={{ marginTop: 12 }}>Unable to assess. Adjust your position and retry.</div>}
       {cue && mode && <div className="demo" role="status" style={{ marginTop: 12 }}>{cue}</div>}
@@ -608,28 +890,97 @@ function LiveSession({ state, exIdx, plan, exercise, patientId }) {
       </div>}
       {mode === 'camera' && <p className="mut">Elapsed {timing.elapsed}s · paused {timing.paused}s · unassessed {timing.unassessed}s</p>}
       {mode === 'replay' && <div className="prog"><b style={{ width: `${Math.min(100, timing.active / replayDuration * 100)}%` }} /></div>}
-      <div className={`row session-actions${!mode ? ' session-start-actions' : ''}`}>
-        {!mode && <><p className="mut start-help">Ready to begin? Your camera opens next, followed by a short resting-position setup.</p><button className="btn session-primary" onClick={startCamera}>Start exercise</button><button className="btn s" onClick={() => setMode('replay')}>Try a simulated demo</button></>}
-        {mode === 'camera' && cameraStatus === 'error' && <><button className="btn session-primary" onClick={startCamera}>Retry camera setup</button>{poseMode !== 'fast' && <button className="btn s" onClick={() => startCamera('fast')}>Try Fast tracking</button>}</>}
-        {mode === 'camera' && ['requesting', 'loading-model'].includes(cameraStatus) && <button className="btn session-primary" disabled>{cameraStatus === 'requesting' ? 'Opening camera…' : 'Loading tracking…'}</button>}
-        {mode === 'camera' && cameraStatus === 'running' && <button className="btn s" onClick={() => setViewMode(value => value === 'camera' ? 'skeleton' : 'camera')}>{viewMode === 'camera' ? 'Skeleton view' : 'Show camera'}</button>}
-        {mode === 'camera' && cameraStatus === 'running' && <button className="btn s" onClick={flipCamera} title="Flip camera">🔄 {facingMode === 'user' ? 'Flip to back camera' : 'Flip to front camera'}</button>}
-        {(mode === 'replay' || cameraReady) && <button className="btn s" onClick={togglePause}>{paused ? 'Resume' : 'Pause'}</button>}
-        {mode === 'replay' && <button className="btn s" onClick={() => setReplayTrackingLost(value => !value)}>{replayTrackingLost ? 'Restore tracking' : 'Simulate tracking loss'}</button>}
-        {(mode === 'replay' || cameraStatus === 'running') && <button className="btn s" aria-pressed={speechEnabled} onClick={() => {
-          const next = !speechEnabled;
-          speechRef.current = next;
-          setSpeechEnabled(next);
-          if (next) speak('Voice guidance on.', true);
-        }}>{speechEnabled ? 'Voice on · tap to mute' : 'Voice off · tap to enable'}</button>}
-        {mode === 'camera' && cameraStatus === 'running' && <button className="btn" disabled={!cameraReady || !timing.active} onClick={() => finishCameraExercise()}>Finish exercise</button>}
-        <button className={mode ? 'btn d' : 'btn s'} onClick={() => {
-          if (timing.active > 0 && !confirm('Stop and save this exercise as partial?')) return;
-          if (mode === 'camera' && timing.active > 0) finishCameraExercise('partial');
-          else if (mode === 'replay' && timing.elapsed) finish({ ex: exercise.ex, t: timing.active, s: null, completion: 'partial', c: 'Replay demo' });
-          else nav('/patient/plan');
-        }}>{mode ? 'Stop' : 'Back to plan'}</button>
-      </div>
+      {/* Session Action Controls */}
+      {!mode && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
+          <p className="mut" style={{ margin: 0, fontSize: 13, textAlign: 'center' }}>
+            Ready to begin? Your camera opens next, followed by a short resting-position setup.
+          </p>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button className="btn session-primary" style={{ minWidth: 180 }} onClick={startCamera}>
+              ▶ Start exercise
+            </button>
+            <button className="btn s" onClick={() => setMode('replay')}>
+              Try simulated demo
+            </button>
+          </div>
+          <button className="btn s" style={{ alignSelf: 'center', fontSize: 12 }} onClick={() => nav('/patient/plan')}>
+            ← Back to plan
+          </button>
+        </div>
+      )}
+
+      {mode === 'camera' && cameraStatus === 'error' && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
+          <button className="btn session-primary" onClick={startCamera}>Retry camera setup</button>
+          {poseMode !== 'fast' && <button className="btn s" onClick={() => startCamera('fast')}>Try Fast tracking</button>}
+        </div>
+      )}
+
+      {mode === 'camera' && ['requesting', 'loading-model'].includes(cameraStatus) && (
+        <div style={{ marginTop: 12 }}>
+          <button className="btn session-primary" disabled>
+            {cameraStatus === 'requesting' ? 'Opening camera…' : 'Loading tracking…'}
+          </button>
+        </div>
+      )}
+
+      {mode && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12, alignItems: 'center' }}>
+          {mode === 'camera' && cameraStatus === 'running' && (
+            <button className="btn s sm" onClick={() => setViewMode(value => value === 'camera' ? 'skeleton' : 'camera')}>
+              {viewMode === 'camera' ? 'Skeleton view' : 'Camera view'}
+            </button>
+          )}
+          {(mode === 'replay' || cameraReady) && (
+            <button className="btn s sm" onClick={togglePause}>
+              {paused ? 'Resume' : 'Pause'}
+            </button>
+          )}
+          {(mode === 'replay' || cameraStatus === 'running') && (
+            <button
+              className="btn s sm"
+              aria-pressed={speechEnabled}
+              onClick={() => {
+                const next = !speechEnabled;
+                speechRef.current = next;
+                setSpeechEnabled(next);
+                if (next) speak('Voice guidance on.', true);
+              }}
+            >
+              {speechEnabled ? '🔊 Voice on' : '🔇 Voice off'}
+            </button>
+          )}
+          {mode === 'replay' && (
+            <button className="btn s sm" onClick={() => setReplayTrackingLost(value => !value)}>
+              {replayTrackingLost ? 'Restore tracking' : 'Simulate loss'}
+            </button>
+          )}
+          <div style={{ flex: 1 }} />
+          {mode === 'camera' && cameraStatus === 'running' && (
+            <button
+              className="btn"
+              disabled={!cameraReady || !timing.active}
+              onClick={() => finishCameraExercise()}
+              style={{ minWidth: 140 }}
+            >
+              Finish exercise
+            </button>
+          )}
+          <button
+            className="btn d"
+            style={{ minWidth: 80 }}
+            onClick={() => {
+              if (timing.active > 0 && !confirm('Stop and save this exercise as partial?')) return;
+              if (mode === 'camera' && timing.active > 0) finishCameraExercise('partial');
+              else if (mode === 'replay' && timing.elapsed) finish({ ex: exercise.ex, t: timing.active, s: null, completion: 'partial', c: 'Replay demo' });
+              else nav('/patient/plan');
+            }}
+          >
+            Stop
+          </button>
+        </div>
+      )}
     </>
   );
 }

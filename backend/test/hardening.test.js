@@ -257,8 +257,23 @@ test('aiDraftSchema requires consent:true — boolean false throws', () => {
   );
 });
 
-// ── 6. POST /api/exercises unauthenticated → 401 ─────────────────────────────
+// ── 6. POST /api/exercises unauthenticated → 401, GET → 200 ──────────────────
 // Uses the full apiApp so the real requireIdentity and exercises router run.
+
+test('GET /api/exercises and GET /api/exercises/demo-models return 200 without auth', async () => {
+  const { apiApp } = await import('../routes/api.js');
+  await serve(apiApp, async base => {
+    const resList = await fetch(`${base}/exercises`);
+    assert.equal(resList.status, 200);
+    const bodyList = await resList.json();
+    assert.ok(Array.isArray(bodyList.exercises));
+
+    const resDemo = await fetch(`${base}/exercises/demo-models`);
+    assert.equal(resDemo.status, 200);
+    const bodyDemo = await resDemo.json();
+    assert.ok(Array.isArray(bodyDemo.demoModels));
+  });
+});
 
 test('POST /api/exercises without Bearer token returns 401 with standard envelope', async () => {
   // We import apiApp. Privy will fail because no credentials in test env,

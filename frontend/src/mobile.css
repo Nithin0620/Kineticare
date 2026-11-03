@@ -87,7 +87,7 @@
   .clinician-app .nav button, .patient-shell .nav button { height: 48px; padding: 5px 2px; gap: 3px; }
   .clinician-app .nav .label, .patient-shell .nav .label { font-size: 11px; }
   .clinician-app .nav::before, .patient-shell .nav::before { inset-block: 6px; left: 6px; width: calc((100% - 12px) / 5); }
-  .clinician-app .nav::before { width: calc((100% - 12px) / 4); }
+  .clinician-app .nav::before { width: calc((100% - 12px) / var(--tab-count, 5)); }
   .clinician-app .wrap, .patient-shell .wrap { max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; }
   .clinician-app .grid:not(.overview-stats), .patient-shell .grid { grid-template-columns: minmax(0,1fr) !important; }
   .clinician-app .row, .patient-shell .row { max-width: 100%; }

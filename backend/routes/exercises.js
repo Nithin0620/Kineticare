@@ -19,10 +19,23 @@
  */
 import express from 'express';
 import { getAllExercises, getExerciseById } from '../services/exerciseRegistry.js';
+import { bundledReferences } from '../services/bundledReferences.js';
+import { requireIdentity } from '../services/identity.js';
 import { asyncRoute, AppError } from '../middleware/errorHandler.js';
 import { validate, idParamSchema } from '../middleware/validation.js';
 
 export const exercisesRouter = express.Router();
+
+// GET /api/exercises/demo-models — fetch all bundled demonstration references
+exercisesRouter.get(
+  '/demo-models',
+  asyncRoute(async (req, res) => {
+    res.json({
+      count: bundledReferences.length,
+      demoModels: bundledReferences,
+    });
+  }),
+);
 
 // GET /api/exercises — list all exercises
 exercisesRouter.get(
@@ -47,16 +60,13 @@ exercisesRouter.get(
 );
 
 // POST /api/exercises — auth guard (clinician only) then explain catalog is read-only
-//
-// BEFORE: the route responded 405 with no auth check at all — any unauthenticated
-//         caller could discover the endpoint and its error shape.
-// AFTER:  requireIdentity in api.js rejects unauthenticated callers (401),
-//         then we additionally require clinician role before returning 405.
-//         This satisfies the acceptance criterion: unauthenticated → 401.
+// requireIdentity returns 401 for unauthenticated callers.
+// Clinicians receive 405 (catalog is read-only).
+// Patients receive 403 (forbidden).
 exercisesRouter.post(
   '/',
+  requireIdentity,
   (req, res, next) => {
-    // identity is always present here (apiApp.use(requireIdentity) runs before us)
     if (req.identity?.role !== 'clinician') {
       return next(new AppError('Exercise catalog writes are restricted to clinicians.', 403, 'FORBIDDEN'));
     }

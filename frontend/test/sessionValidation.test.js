@@ -11,8 +11,6 @@ import {
   normalizeDistance,
   estimatePatientDistance,
   checkPatientDistance,
-  MIN_OPTIMAL_DISTANCE_M,
-  MAX_OPTIMAL_DISTANCE_M,
 } from '../src/vision/sessionValidation.js';
 import { calibrateRest } from '../src/exercise/reference.js';
 

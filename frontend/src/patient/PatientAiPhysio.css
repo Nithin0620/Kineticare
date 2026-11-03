@@ -1,316 +1,394 @@
 /**
  * frontend/src/patient/PatientAiPhysio.css
  * Kira · Clinical AI Physio Companion styling.
+ * Clean, focused conversational design with guaranteed navigation clearance.
  */
 
 .physio-page {
   display: flex;
   flex-direction: column;
-  max-width: 860px;
+  max-width: 780px;
   margin: 0 auto;
-  padding: 10px 14px 130px;
+  padding: 8px 12px calc(88px + env(safe-area-inset-bottom));
   box-sizing: border-box;
+  min-height: calc(100vh - 120px);
 }
 
-/* Header Card */
+/* Compact Header */
 .physio-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 18px;
+  padding: 10px 16px;
   background: var(--card, #ffffff);
   border: 1px solid var(--card-border, #e8e7ee);
-  border-radius: var(--radius-lg, 18px);
-  margin-bottom: 10px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+  border-radius: var(--radius-md, 14px);
+  margin-bottom: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
 }
 
-.physio-header-title {
+.physio-header-identity {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .physio-avatar-mark {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, var(--pri, #6454e8), #8874f6);
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--pri);
   color: #ffffff;
   display: grid;
   place-items: center;
-  box-shadow: 0 4px 14px rgba(100, 84, 232, 0.28);
+  box-shadow: 0 3px 10px rgba(13, 148, 136, 0.25);
   flex-shrink: 0;
-}
-
-.physio-avatar-mark.kira {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
 }
 
 .physio-title-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 2px;
 }
 
 .physio-header-text h1 {
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 700;
   margin: 0;
   color: var(--ink, #1c1c1f);
   letter-spacing: -0.02em;
 }
 
-.physio-role-chip {
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 2px 7px;
-  border-radius: 9999px;
-  background: var(--pri2, #efeaff);
-  color: var(--pri, #6454e8);
-  border: 1px solid #dcd7fa;
-}
-
 .physio-header-text p {
-  font-size: 11.5px;
-  color: var(--mut, #767482);
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.physio-status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
-  display: inline-block;
-  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--mut, #71717a);
+  margin: 1px 0 0;
 }
 
 .physio-header-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
-.physio-btn-subtle {
+.physio-status-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: var(--soft, #f4f3f8);
-  border: 1px solid var(--card-border, #e6e5ec);
-  color: var(--ink, #1c1c1f);
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 600;
-  padding: 6px 11px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.15s ease;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  background: var(--soft, #f4f1ea);
+  border: 1px solid var(--card-border);
+  color: var(--ink-secondary);
+  white-space: nowrap;
 }
 
-.physio-btn-subtle:hover {
-  background: var(--pri2, #efeaff);
-  border-color: var(--pri, #6454e8);
-  color: var(--pri, #6454e8);
+.physio-status-chip.online {
+  background: var(--okb, #dcfce7);
+  color: var(--ok, #15803d);
+  border-color: rgba(21, 128, 61, 0.2);
 }
 
-/* Meta Bar: Foundation + Care Plan */
-.physio-meta-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  padding: 8px 14px;
-  background: linear-gradient(135deg, #f7f6fc, #fcfbff);
-  border: 1px solid #e5e2f5;
-  border-radius: 12px;
-  margin-bottom: 10px;
-  font-size: 11.5px;
-  color: var(--ink-secondary, #565463);
-}
-
-.physio-meta-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.physio-meta-item strong {
-  color: var(--pri-dark, #3e31a8);
-}
-
-.physio-meta-divider {
-  width: 1px;
-  height: 14px;
-  background: #dedaee;
+.physio-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
   display: inline-block;
 }
 
-.physio-session-tag {
-  background: var(--card, #ffffff);
-  border: 1px solid #d9d4f2;
+.physio-dot.green {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}
+
+.physio-dot.gray {
+  background: #9ca3af;
+}
+
+.physio-clear-btn {
+  background: transparent;
+  border: 1px solid var(--card-border);
   border-radius: 9999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--mut);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.physio-clear-btn:hover {
+  background: var(--soft);
+  color: var(--ink);
+  border-color: var(--mut);
+}
+
+/* Collapsible Clinical Context Panel */
+.physio-context-panel {
+  background: var(--card, #ffffff);
+  border: 1px solid var(--card-border, #e8e7ee);
+  border-radius: var(--radius-md, 14px);
+  margin-bottom: 8px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.physio-context-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--ink-secondary);
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.physio-context-bar:hover {
+  background: var(--soft);
+}
+
+.physio-context-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.physio-context-summary strong {
+  color: var(--ink);
+}
+
+.physio-context-badge {
   font-size: 10px;
   font-weight: 600;
+  background: var(--pri2, #f0fdfa);
+  color: var(--pri, #0d9488);
+  border: 1px solid var(--pri-border, #ccfbf1);
   padding: 1px 7px;
-  color: var(--pri, #6454e8);
-}
-
-/* Triage Pill Tabs */
-.physio-triage-tabs {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 2px 2px 8px;
-  margin-bottom: 8px;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.physio-triage-tabs::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
-}
-
-.physio-triage-pill {
-  flex-shrink: 0;
-  padding: 6px 12px;
   border-radius: 9999px;
-  border: 1px solid var(--card-border, #e2e1ea);
-  background: var(--card, #ffffff);
-  color: var(--ink, #2a2930);
-  font-size: 11.5px;
+}
+
+.physio-context-toggle-icon {
+  font-size: 11px;
   font-weight: 600;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: all 0.15s ease;
-  user-select: none;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  color: var(--pri);
+  flex-shrink: 0;
+  margin-left: 8px;
 }
 
-.physio-triage-pill:hover {
-  background: var(--pri2, #f3efff);
-  border-color: var(--pri, #6454e8);
-  color: var(--pri, #6454e8);
-  transform: translateY(-1px);
+.physio-context-drawer {
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--card-border);
+  background: var(--soft, #faf8f5);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.physio-triage-pill.active {
-  background: linear-gradient(135deg, var(--pri, #6454e8), #7c6cf0);
-  border-color: transparent;
-  color: #ffffff;
-  box-shadow: 0 3px 10px rgba(100, 84, 232, 0.28);
+.physio-context-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 14px;
 }
 
-/* Conversation Room */
+@media (max-width: 580px) {
+  .physio-context-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.physio-context-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.physio-context-k {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--mut);
+}
+
+.physio-context-v {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.physio-clinician-note-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-left: 3px solid var(--pri);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+/* Main Chat Container */
 .physio-chat-box {
   background: var(--card, #ffffff);
   border: 1px solid var(--card-border, #e8e7ee);
   border-radius: var(--radius-lg, 18px);
   display: flex;
   flex-direction: column;
-  height: clamp(480px, calc(100dvh - 300px), 720px);
+  height: clamp(480px, calc(100vh - 240px), 720px);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
   overflow: hidden;
   position: relative;
 }
 
+/* Messages Scroll Area */
 .physio-messages-area {
   flex: 1 1 0;
   overflow-y: auto;
-  padding: 16px 18px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  scroll-behavior: smooth;
 }
 
-/* Welcome empty card */
-.physio-welcome-card {
-  padding: 18px;
-  background: linear-gradient(135deg, #f9f8fe, #ffffff);
-  border: 1px dashed #d8d4ec;
-  border-radius: 14px;
-}
-
-.physio-welcome-header {
+/* Empty State / Welcome Screen */
+.physio-empty-welcome {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 14px;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 24px 16px;
+  margin: auto 0;
+  max-width: 580px;
+  align-self: center;
 }
 
-.physio-welcome-avatar {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+.physio-empty-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--pri);
   color: #ffffff;
   display: grid;
   place-items: center;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.3);
+  margin-bottom: 12px;
+}
+
+.physio-empty-welcome h3 {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 6px;
+  letter-spacing: -0.02em;
+}
+
+.physio-empty-welcome p {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-secondary);
+  margin: 0 0 20px;
+}
+
+/* Polished Starter Cards */
+.physio-suggestions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.physio-starter-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--soft, #f8f7f4);
+  border: 1px solid var(--card-border, #e8e4dc);
+  border-radius: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  width: 100%;
+}
+
+.physio-starter-card:hover {
+  background: var(--card);
+  border-color: var(--pri);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 12px rgba(13, 148, 136, 0.08);
+}
+
+.starter-icon-wrap {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
 }
 
-.physio-welcome-header h3 {
-  font-size: 14.5px;
+.physio-starter-card:hover .starter-icon-wrap {
+  background: var(--pri2);
+  border-color: var(--pri-border);
+}
+
+.starter-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.starter-title {
+  font-size: 12.5px;
   font-weight: 700;
-  color: var(--ink, #1c1c1f);
-  margin: 0 0 4px;
+  color: var(--ink);
+  margin-bottom: 2px;
 }
 
-.physio-welcome-header p {
-  font-size: 12px;
-  line-height: 1.55;
-  color: var(--ink-secondary, #56545f);
-  margin: 0;
+.starter-desc {
+  font-size: 11px;
+  color: var(--ink-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
 }
 
-.physio-suggestion-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 8px;
+.starter-arrow {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--mut);
+  transition: transform 0.15s ease, color 0.15s ease;
 }
 
-.physio-suggestion-card {
-  padding: 9px 12px;
-  background: var(--card, #ffffff);
-  border: 1px solid var(--card-border, #e6e5ec);
-  border-radius: 10px;
-  text-align: left;
-  font-size: 11.5px;
-  color: var(--ink, #25242b);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  line-height: 1.4;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.physio-starter-card:hover .starter-arrow {
+  color: var(--pri);
+  transform: translateX(3px);
 }
 
-.physio-suggestion-card:hover {
-  background: var(--pri2, #f1eeff);
-  border-color: var(--pri, #6454e8);
-  color: var(--pri, #6454e8);
-  transform: translateY(-1px);
-}
-
-/* Message Rows */
+/* Chat Message Rows */
 .physio-msg-row {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: flex-start;
   width: 100%;
 }
@@ -332,14 +410,15 @@
 }
 
 .physio-msg-row.assistant .physio-msg-avatar {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: var(--pri);
   color: #ffffff;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.25);
 }
 
 .physio-msg-row.user .physio-msg-avatar {
   background: var(--soft, #ecebf2);
   color: var(--ink, #1f1e24);
+  border: 1px solid var(--card-border);
 }
 
 .physio-msg-body {
@@ -372,92 +451,40 @@
   padding: 1px 6px;
   border-radius: 6px;
   background: var(--pri2, #efeaff);
-  color: var(--pri, #6454e8);
+  color: var(--pri, #0d9488);
 }
 
 /* Bubbles */
 .physio-bubble {
   padding: 12px 16px;
   font-size: 13.5px;
-  line-height: 1.55;
+  line-height: 1.6;
   word-break: break-word;
-}
-
-.physio-msg-row.user .physio-bubble {
-  background: linear-gradient(135deg, var(--pri, #6454e8), #5040d6);
-  color: #ffffff;
-  border-radius: 16px 4px 16px 16px;
-  box-shadow: 0 3px 12px rgba(100, 84, 232, 0.22);
+  border-radius: 16px;
 }
 
 .physio-msg-row.assistant .physio-bubble {
-  background: #ffffff;
-  color: var(--ink, #1f1f23);
-  border: 1px solid var(--card-border, #e7e6ee);
-  border-radius: 4px 16px 16px 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.025);
+  background: var(--soft, #faf8f5);
+  border: 1px solid var(--card-border, #e8e4dc);
+  color: var(--ink);
+  border-top-left-radius: 4px;
 }
 
-.physio-bubble.typing {
-  padding: 10px 14px;
-  background: #f8f7fc;
+.physio-msg-row.user .physio-bubble {
+  background: var(--pri);
+  color: #ffffff;
+  border-top-right-radius: 4px;
 }
 
-/* Formatted Content in Bubbles */
-.physio-formatted-content {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.physio-msg-row.user .physio-user-content {
+  color: #ffffff;
 }
 
-.physio-bubble-p {
-  margin: 0;
-  line-height: 1.55;
-}
-
-.physio-section-heading {
+/* Typing Indicator */
+.physio-typing-indicator {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-  margin-bottom: 2px;
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--pri-dark, #3b2baa);
-}
-
-.physio-section-badge {
-  background: var(--pri2, #efeaff);
-  color: var(--pri, #6454e8);
-  font-size: 11px;
-  font-weight: 700;
-  padding: 1px 6px;
-  border-radius: 6px;
-  border: 1px solid #d9d4f4;
-}
-
-.physio-bubble-list {
-  margin: 2px 0 4px;
-  padding-left: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.physio-bubble-list li {
-  line-height: 1.5;
-  color: var(--ink, #1f1f23);
-}
-
-.physio-bubble-list li strong {
-  color: var(--ink, #111827);
-}
-
-/* Typing / Loading Indicator */
-.physio-typing-indicator {
-  display: flex;
-  align-items: center;
-  gap: 5px;
+  gap: 4px;
   padding: 4px 6px;
 }
 
@@ -465,79 +492,69 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--pri, #6454e8);
-  animation: physio-blink 1.4s infinite ease-in-out both;
+  background: var(--pri);
+  display: inline-block;
+  animation: physioBounce 1.4s infinite ease-in-out both;
 }
 
-.physio-typing-indicator span:nth-child(2) {
-  animation-delay: 0.2s;
+.physio-typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+.physio-typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes physioBounce {
+  0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
+  40% { transform: scale(1); opacity: 1; }
 }
 
-.physio-typing-indicator span:nth-child(3) {
-  animation-delay: 0.4s;
-}
-
-@keyframes physio-blink {
-  0%, 80%, 100% {
-    opacity: 0.25;
-    transform: scale(0.8);
-  }
-  40% {
-    opacity: 1;
-    transform: scale(1.15);
-  }
-}
-
-/* Error banner */
+/* Error Banner */
 .physio-error-banner {
-  padding: 10px 14px;
-  font-size: 12px;
-  line-height: 1.45;
-  border-radius: 10px;
-  background: var(--badb, #fff0ef);
-  color: var(--bad, #b91c1c);
-  border: 1px solid rgba(185, 28, 28, 0.2);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin: 4px 0;
+  padding: 10px 14px;
+  background: var(--badb, #ffe4e6);
+  border: 1px solid rgba(190, 18, 60, 0.2);
+  border-radius: 10px;
+  font-size: 12.5px;
+  color: var(--bad, #be123c);
 }
 
 .physio-error-banner button {
-  background: transparent;
-  border: 1px solid var(--bad, #b91c1c);
-  color: var(--bad, #b91c1c);
-  padding: 3px 8px;
+  background: var(--bad);
+  color: #ffffff;
+  border: 0;
   border-radius: 6px;
+  padding: 4px 10px;
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
 }
 
-/* Input Form */
-.physio-form-container {
-  flex-shrink: 0;
-  padding: 10px 14px 12px;
+/* Anchored Composer Area */
+.physio-composer-area {
+  padding: 12px 16px 14px;
   background: var(--card, #ffffff);
   border-top: 1px solid var(--card-border, #e8e7ee);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .physio-input-wrap {
   display: flex;
-  gap: 8px;
   align-items: flex-end;
-  background: var(--soft, #f7f6fb);
-  border: 1px solid var(--card-border, #e2e1ea);
+  gap: 8px;
+  background: var(--soft, #faf8f5);
+  border: 1.5px solid var(--card-border, #e8e4dc);
   border-radius: 14px;
-  padding: 6px 8px;
-  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  padding: 8px 10px 8px 14px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .physio-input-wrap:focus-within {
-  border-color: var(--pri, #6454e8);
-  background: #ffffff;
-  box-shadow: 0 0 0 3px rgba(100, 84, 232, 0.12);
+  border-color: var(--pri);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+  background: var(--card);
 }
 
 .physio-input-wrap textarea {
@@ -546,83 +563,106 @@
   border: 0;
   outline: none;
   font-family: inherit;
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--ink, #1c1c1f);
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink);
   resize: none;
-  max-height: 90px;
-  min-height: 36px;
-  padding: 6px 4px;
+  padding: 0;
+  max-height: 120px;
+  min-height: 24px;
+}
+
+.physio-input-wrap textarea::placeholder {
+  color: var(--mut);
 }
 
 .physio-send-btn {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--pri, #6454e8), #7c6cf0);
+  background: var(--pri);
   color: #ffffff;
   border: 0;
   display: grid;
   place-items: center;
   cursor: pointer;
   flex-shrink: 0;
-  transition: transform 0.12s ease, opacity 0.12s ease;
-  box-shadow: 0 2px 8px rgba(100, 84, 232, 0.28);
+  transition: all 0.15s ease;
 }
 
 .physio-send-btn:hover:not(:disabled) {
-  transform: scale(1.04);
+  background: var(--pri-dark);
+  transform: translateY(-1px);
 }
 
 .physio-send-btn:disabled {
-  opacity: 0.45;
+  opacity: 0.35;
   cursor: not-allowed;
-  box-shadow: none;
+  transform: none;
 }
 
-.physio-disclaimer {
-  font-size: 10.5px;
-  line-height: 1.4;
-  color: var(--mut, #888694);
+.physio-disclaimer-subtext {
+  font-size: 11px;
+  color: var(--mut);
   text-align: center;
-  margin-top: 8px;
+  line-height: 1.35;
 }
 
-/* Consent Screen */
+/* Consent Gate Screen */
 .physio-consent-screen {
-  padding: 32px 24px;
-  background: var(--card, #ffffff);
-  border: 1px solid var(--card-border, #e8e7ee);
-  border-radius: var(--radius-lg, 18px);
-  text-align: center;
-  max-width: 520px;
-  margin: 40px auto 0;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 24px 20px;
 }
 
-.physio-consent-screen h2 {
+.physio-consent-card {
+  max-width: 480px;
+  text-align: center;
+  padding: 24px;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+.physio-consent-icon {
+  margin-bottom: 12px;
+}
+
+.physio-consent-card h2 {
   font-size: 18px;
   font-weight: 700;
-  color: var(--ink, #1c1c1f);
-  margin: 0 0 10px;
+  margin: 0 0 8px;
+  color: var(--ink);
 }
 
-.physio-consent-screen p {
+.physio-consent-card p {
   font-size: 13px;
-  line-height: 1.55;
-  color: var(--ink-secondary, #56545f);
+  color: var(--ink-secondary);
+  line-height: 1.5;
   margin: 0 0 16px;
 }
 
-.physio-consent-screen ul {
+.physio-consent-bullets {
   text-align: left;
   font-size: 12px;
-  line-height: 1.6;
-  color: var(--ink-secondary, #464450);
-  margin: 0 0 24px;
+  line-height: 1.55;
+  color: var(--ink-secondary);
   padding-left: 20px;
+  margin: 0 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.physio-consent-screen ul li {
-  margin-bottom: 6px;
+.physio-consent-btn {
+  width: 100%;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--pri);
+  color: #ffffff;
+  border-radius: 10px;
+  cursor: pointer;
 }

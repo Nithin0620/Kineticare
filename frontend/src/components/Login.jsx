@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../auth/authContext';
 import Brand from './Brand';
 import ThemeToggle from './ThemeToggle';
@@ -33,6 +33,6 @@ export default function Login() {
       {authenticated && !user && <button className="btn s" disabled={busy} onClick={() => run(signOut)}>Sign out</button>}
     </section>
     <p className="mut">Camera video stays on your device. You control clinician sharing.</p>
+    <p style={{ textAlign: 'center', marginTop: '16px' }}><Link to="/" style={{ fontSize: '13px', color: 'var(--pri)' }}>← Back to Kineticare overview</Link></p>
   </div>;
 }
-

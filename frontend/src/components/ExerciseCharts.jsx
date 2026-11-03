@@ -82,9 +82,9 @@ function BarChart({ title, rows = [], max = 0 }) {
               />
               <text
                 x={xCenter}
-                y={base - barHeight - 6}
+                y={Math.max(top - 2, base - barHeight - 6)}
                 textAnchor="middle"
-                fontSize="13"
+                fontSize="12"
                 fontWeight="700"
                 fill="var(--ink)"
               >

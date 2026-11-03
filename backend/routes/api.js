@@ -36,12 +36,25 @@ apiApp.use(helmet());
 apiApp.disable('x-powered-by');
 apiApp.disable('etag');
 
-// ── CORS — only the real frontend origin ─────────────────────────────────────
+// ── CORS — allow configured frontend origin and standard dev origins ─────────
 const ALLOWED_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
+const DEFAULT_ALLOWED_ORIGINS = new Set([
+  ALLOWED_ORIGIN,
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:3001',
+  'http://127.0.0.1:3001',
+]);
 
 apiApp.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (origin === ALLOWED_ORIGIN) res.set('Access-Control-Allow-Origin', origin);
+  if (origin && (DEFAULT_ALLOWED_ORIGINS.has(origin) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin))) {
+    res.set('Access-Control-Allow-Origin', origin);
+  } else if (!origin) {
+    res.set('Access-Control-Allow-Origin', '*');
+  }
   res.set('Vary', 'Origin');
   res.set('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Request-Id');
@@ -109,6 +122,7 @@ apiApp.get('/health', (req, res) => {
 });
 
 // ── Public sub-routers (require only Privy auth) ──────────────────────────────
+apiApp.use('/exercises', exercisesRouter);
 apiApp.use('/auth', authRouter);
 apiApp.use('/chat', chatRouter);
 
@@ -120,7 +134,6 @@ apiApp.use('/ai', [aiLimiter], aiRouter);
 apiApp.use(requireIdentity);
 
 apiApp.use('/records', recordsRouter);
-apiApp.use('/exercises', exercisesRouter);
 apiApp.use('/analytics', analyticsRouter);
 apiApp.use('/clinical', analyticsRouter); // Alias for /api/clinical/soap-note
 apiApp.use('/reports', reportsRouter);

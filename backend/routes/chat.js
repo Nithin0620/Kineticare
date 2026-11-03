@@ -4,15 +4,17 @@
  * Kineticare AI Chat Assistant Route (powered by Groq).
  *
  * Endpoints:
- * - GET  /status -> { configured: boolean, role: string }
- * - POST /       -> { reply: string, provider: 'groq', model: string, focusedPatient: string|null }
+ * - GET    /status  -> { configured: boolean, role: string }
+ * - GET    /history -> { messages: Array } (persistent user-scoped conversation history)
+ * - DELETE /history -> { success: boolean } (clears persistent user-scoped conversation)
+ * - POST   /        -> { reply: string, provider: 'groq', model: string, focusedPatient: string|null }
  *
  * Security:
  * - Mounted before /ai so both patients and clinicians can access it.
  * - Authenticated with requireIdentity.
  * - Context built strictly server-side from verified identity.
  * - Rate limited per user per minute via chatRateLimits collection.
- * - Never logs or persists conversations.
+ * - Scoped persistence strictly bound to authenticated identity and consent.
  */
 
 import express from 'express';
@@ -155,6 +157,36 @@ export function createChatRouter({
     });
   });
 
+  // GET /api/chat/history — load persistent conversation for the authenticated identity
+  router.get('/history', async (req, res, next) => {
+    try {
+      const db = await database();
+      const collection = db.collection('chatHistory');
+      const query = { uid: req.identity.uid, role: req.identity.role };
+      const records = collection.find ? await collection.find(query).toArray() : [];
+      const latest = records.at(-1);
+      res.json({ messages: latest?.messages || [] });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // DELETE /api/chat/history — clear conversation history
+  router.delete('/history', async (req, res, next) => {
+    try {
+      const db = await database();
+      const collection = db.collection('chatHistory');
+      if (collection.deleteMany) {
+        await collection.deleteMany({ uid: req.identity.uid });
+      } else if (collection.updateOne) {
+        await collection.updateOne({ uid: req.identity.uid }, { $set: { messages: [] } });
+      }
+      res.json({ success: true });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   // POST /api/chat
   router.post('/', async (req, res, next) => {
     try {
@@ -194,6 +226,22 @@ export function createChatRouter({
         env,
         fetchImpl,
       });
+
+      // 6. Non-blocking persistent conversation storage
+      try {
+        const historyCollection = db.collection('chatHistory');
+        if (historyCollection && typeof historyCollection.insertOne === 'function') {
+          await historyCollection.insertOne({
+            uid: req.identity.uid,
+            role,
+            patientId: role === 'clinician' ? (patientId || null) : null,
+            messages: [...validMessages, { role: 'assistant', content: reply }],
+            createdAt: new Date(),
+          });
+        }
+      } catch {
+        // Non-blocking history write
+      }
 
       res.json({
         reply,

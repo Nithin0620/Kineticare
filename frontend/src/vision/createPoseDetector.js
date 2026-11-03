@@ -109,10 +109,35 @@ async function loadDetector(mode) {
   }
 
   // MoveNet: Initialize WebGL with WASM/CPU fallback
-  await initializeBackend(tf);
+  try {
+    await initializeBackend(tf);
 
-  return retryWithBackoff(() => poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, {
-    modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
-    enableSmoothing: true,
-  }), { maxRetries: 3, initialDelayMs: 600 });
+    return await retryWithBackoff(() => poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, {
+      modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+      enableSmoothing: true,
+    }), { maxRetries: 2, initialDelayMs: 500 });
+  } catch (movenetErr) {
+    console.warn('MoveNet detector failed to load (network restricted or TFHub unavailable). Gracefully falling back to local BlazePose:', movenetErr);
+    const rawBase = import.meta.env.BASE_URL || '/';
+    const localBase = `${rawBase.endsWith('/') ? rawBase : `${rawBase}/`}pose/0.5.1675469404`;
+    const cdnBase = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404';
+
+    let solutionPath = localBase;
+    try {
+      await loadPoseRuntime(localBase, cdnBase);
+    } catch {
+      solutionPath = cdnBase;
+      await loadPoseRuntime(cdnBase);
+    }
+
+    const fallbackDetector = await retryWithBackoff(() => poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, {
+      runtime: 'mediapipe',
+      modelType: 'lite',
+      enableSmoothing: true,
+      solutionPath,
+    }), { maxRetries: 2, initialDelayMs: 400 });
+
+    fallbackDetector.fallbackMode = 'detailed';
+    return fallbackDetector;
+  }
 }

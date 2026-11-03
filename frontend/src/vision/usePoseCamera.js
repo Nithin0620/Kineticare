@@ -132,7 +132,16 @@ export default function usePoseCamera(onPose, filterConfig = {}) {
         };
       });
 
-      const video = videoRef.current;
+      // Ensure video element is available (allowing brief tick for DOM mount)
+      let video = videoRef.current;
+      if (!video) {
+        for (let i = 0; i < 20; i++) {
+          await new Promise(r => setTimeout(r, 50));
+          if (videoRef.current) { video = videoRef.current; break; }
+        }
+      }
+      if (!video) throw new Error('Camera video element is not available.');
+
       video.srcObject = stream;
       await video.play();
       if (generation !== generationRef.current) return false;
@@ -174,14 +183,17 @@ export default function usePoseCamera(onPose, filterConfig = {}) {
       }));
 
       // Attach WebGL context loss listener
-      const detachContextListener = attachWebGLContextLossListener(canvasRef.current, lostDesc => {
-        if (runningRef.current) {
-          setError(lostDesc.message);
-          setErrorDescriptor(lostDesc);
-          setStatus('error');
-          stop();
-        }
-      });
+      let detachContextListener = () => {};
+      if (canvasRef.current) {
+        detachContextListener = attachWebGLContextLossListener(canvasRef.current, lostDesc => {
+          if (runningRef.current) {
+            setError(lostDesc.message);
+            setErrorDescriptor(lostDesc);
+            setStatus('error');
+            stop();
+          }
+        });
+      }
 
       let previousFrame = null;
       let consecutiveErrors = 0;

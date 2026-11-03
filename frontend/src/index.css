@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-:root { --pri: #6454e8; --pri-dark: #5141ce; --pri-light: #8b7df2; --pri2: #efecff; --bg: #e8e7ed; --card: #fff; --card-border: #eeedf2; --ink: #202023; --ink-secondary: #56545f; --mut: #777480; --soft: #f5f4f8; --ok: #237942; --okb: #eaf9e9; --warn: #946020; --warnb: #fff3df; --bad: #ba3434; --badb: #fff0ef; --radius-sm: 10px; --radius-md: 12px; --radius-lg: 20px; --radius-xl: 28px; --ease-settle: cubic-bezier(.22,1,.36,1); --ease-feedback: cubic-bezier(.4,0,.2,1); }
+:root { --pri: #0d9488; --pri-dark: #0f766e; --pri-light: #14b8a6; --pri2: #f0fdfa; --pri-border: #ccfbf1; --bg: #faf8f5; --card: #ffffff; --card-border: #e8e4dc; --ink: #18181b; --ink-secondary: #52525b; --mut: #71717a; --soft: #f4f1ea; --ok: #15803d; --okb: #dcfce7; --warn: #b45309; --warnb: #fef3c7; --bad: #be123c; --badb: #ffe4e6; --radius-sm: 10px; --radius-md: 14px; --radius-lg: 20px; --radius-xl: 28px; --ease-settle: cubic-bezier(.22,1,.36,1); --ease-feedback: cubic-bezier(.4,0,.2,1); }
 
 /* Kineticare wellness design: shared components and responsive layouts. */
 
@@ -20,7 +20,7 @@ textarea:focus-visible { outline: 2px solid var(--pri); outline-offset: 2px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
 .wrap { overflow-x: auto; }
 .cam .st { position: absolute; top: 12px; left: 12px; z-index: 2; }
-.pose-layer { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.pose-layer { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transform: scaleX(-1); }
 .cam canvas.pose-layer { z-index: 1; }
 .arm { transform-box: fill-box; transform-origin: top center; animation: sw 1.6s ease-in-out infinite; }
 .paused .arm { animation-play-state: paused; }
@@ -136,7 +136,7 @@ tbody tr:last-child td { border-bottom: 0; }
 .prog b { display: block; height: 100%; background: var(--pri); }
 .stat { font-size: 28px; font-weight: 700; color: var(--ink); }
 .srch { display: flex; align-items: center; gap: 10px; width: 100%; border: 1px solid var(--card-border); background: var(--card); border-radius: 11px; padding: 12px 16px; color: var(--mut); cursor: pointer; margin: 16px 0 12px; }
-.cam { background: #111827; border-radius: 20px; height: 320px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.cam { background: #0c0d12; border-radius: 20px; width: 100%; aspect-ratio: 4 / 3; min-height: 280px; max-height: clamp(360px, 58vh, 520px); position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12); border: 1px solid var(--card-border); }
 .patient-content .page-motion > h1 { margin-bottom: 20px; }
 .patient-content .page-motion > .row:first-child { margin-bottom: 20px; }
 .patient-detail-page { max-width: 760px; margin-inline: auto; }
@@ -226,13 +226,17 @@ h3 { margin: 0; color: var(--ink); font-weight: 650; letter-spacing: -0.02em; fo
 .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 18px; padding: 22px; margin-bottom: 16px; box-shadow: none; transition: transform 0.15s ease, box-shadow 0.15s ease; border-color: var(--card-border); }
 .activity-module { background: var(--card); border: 1px solid var(--card-border); border-radius: 18px; padding: 22px; margin-bottom: 16px; border-color: var(--card-border); box-shadow: none; }
 .exercise-list { border: 1px solid var(--card-border); background: var(--card); border-radius: 18px; overflow: hidden; border-color: var(--card-border); box-shadow: none; }
-.btn { background: #202023; color: var(--card); border: 1px solid #0874bb; border-radius: 12px; padding: 11px 18px; min-height: 44px; cursor: pointer; font-weight: 600; font-size: 12px; letter-spacing: -0.01em; display: inline-flex; align-items: center; justify-content: center; gap: 12px; transition: transform 200ms var(--ease-feedback), background 200ms var(--ease-feedback), box-shadow 200ms var(--ease-feedback), border-color 200ms var(--ease-feedback), color 200ms var(--ease-feedback); box-shadow: none; border-color: #202023; }
+.btn { background: var(--ink); color: #ffffff; border: 1px solid var(--ink); border-radius: 12px; padding: 11px 18px; min-height: 44px; cursor: pointer; font-weight: 600; font-size: 12px; letter-spacing: -0.01em; display: inline-flex; align-items: center; justify-content: center; gap: 12px; transition: transform 200ms var(--ease-feedback), background 200ms var(--ease-feedback), box-shadow 200ms var(--ease-feedback), border-color 200ms var(--ease-feedback), color 200ms var(--ease-feedback); box-shadow: none; }
 .btn:hover:not(:disabled) { background: #39363f; box-shadow: 0 4px 12px #20202315; border-color: #39363f; }
-.btn.s { background: var(--soft); color: var(--ink); border-color: var(--card-border); box-shadow: none; border: 1px solid #dedfdb; }
-.btn.w { background: var(--soft); color: var(--ink); box-shadow: none; border: 1px solid #dedfdb; border-color: var(--card-border); }
+.btn.s { background: var(--soft); color: var(--ink); border: 1px solid var(--card-border); box-shadow: none; }
+.btn.w { background: var(--soft); color: var(--ink); border: 1px solid var(--card-border); box-shadow: none; }
 .btn.s:hover:not(:disabled) { background: var(--pri2); }
 .btn.w:hover:not(:disabled) { background: var(--pri2); }
-.btn.d { background: var(--bad); color: var(--card); border-color: var(--bad); }
+.btn.d { background: transparent; color: var(--bad); border-color: var(--bad); }
+.btn.d:hover:not(:disabled) { background: var(--badb); }
+.btn.pri { background: var(--pri); color: #fff; border-color: var(--pri); }
+.btn.pri:hover:not(:disabled) { background: var(--pri-dark); border-color: var(--pri-dark); }
+.session-primary { background: var(--pri) !important; color: #fff !important; border-color: var(--pri) !important; min-height: 50px; font-size: 14px; font-weight: 700; }
 button:focus-visible { outline: 2px solid var(--pri); outline-offset: 4px; outline-color: var(--pri); }
 a:focus-visible { outline: 2px solid var(--pri); outline-offset: 4px; outline-color: var(--pri); }
 summary:focus-visible { outline: 2px solid var(--pri); outline-offset: 4px; outline-color: var(--pri); }
@@ -592,3 +596,13 @@ summary { cursor: pointer; min-height: 44px; padding-block: 10px; font-weight: 6
 .session-demo video, .session-shell .vid video { max-height: 300px; object-fit: contain; background: #101827; margin-top: 12px; }
 
 @media (max-width:800px) { .meetings-panel .week-days span { width: 24px; height: 24px; font-size: 10px; } }
+
+/* === Additional session & live-page UI improvements === */
+.tracking-select { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; background: var(--soft); border: 1px solid var(--card-border); border-radius: 14px; margin: 12px 0; font-size: 13px; font-weight: 600; color: var(--ink-secondary); }
+.tracking-select select { margin-top: 4px; }
+.tracking-select .mut { font-size: 12px; margin-top: 2px; color: var(--mut); }
+.guided-session-container { display: flex; flex-direction: column; gap: 0; }
+.session-demo { border-radius: 16px; overflow: hidden; margin: 12px 0; }
+.session-actions-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+.live-page-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 4px; }
+.live-exercise-tabs { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }

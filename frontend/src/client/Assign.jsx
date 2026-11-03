@@ -5,16 +5,20 @@ import { useRecords } from '../records/recordsContext';
 import { toast } from '../components/toastBus';
 import { useAuth } from '../auth/authContext';
 import { assessmentIsStale } from '../../../shared/assessmentFields.js';
+import { getExerciseCapability } from '../../../shared/exerciseCapabilities.js';
+import { connectedApi } from '../services/atlasRecords';
 import { isSideExercise, exerciseMeta } from '../exercise/measure';
 import Icon from '../components/Icon';
 
 const ExerciseAnimationPreview = lazy(() => import('../components/ExerciseAnimationPreview'));
 
 const defaults = exercise => {
+  const cap = getExerciseCapability(exercise);
+  const isTracked = cap.capabilities.cameraTracking;
   const isArm = exercise.toLowerCase().includes('arm') || exercise.toLowerCase().includes('shoulder') || exercise.toLowerCase().includes('scaption');
   const isHip = exercise.toLowerCase().includes('toe') || exercise.toLowerCase().includes('bend') || exercise.toLowerCase().includes('hip');
   const isAnkle = exercise.toLowerCase().includes('heel') || exercise.toLowerCase().includes('calf');
-  const defTargetDeg = isArm ? 75 : isHip ? 60 : isAnkle ? 25 : 45;
+  const defTargetDeg = isTracked ? (isArm ? 75 : isHip ? 60 : isAnkle ? 25 : 45) : 0;
 
   return {
     ex: exercise,
@@ -22,7 +26,7 @@ const defaults = exercise => {
     t: 45,
     targetReps: 5,
     targetExcursionDeg: defTargetDeg,
-    videoOnly: VIDEO_ONLY_EXERCISES.includes(exercise),
+    videoOnly: !isTracked || VIDEO_ONLY_EXERCISES.includes(exercise),
     note: '',
     referenceVersionId: '',
   };
@@ -74,7 +78,12 @@ export default function ClientAssign() {
   // AI Generator state
   const [showAiGenModal, setShowAiGenModal] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
+  const [aiReference, setAiReference] = useState('Kisner & Colby, Therapeutic Exercise, 6th edition (2012)');
+  const [aiReferenceNotes, setAiReferenceNotes] = useState('');
+  const [aiConsent, setAiConsent] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiDraft, setAiDraft] = useState(null);
+  const [aiError, setAiError] = useState('');
 
   // Compile full pool of exercises
   const availableExerciseNames = useMemo(() => {
@@ -129,8 +138,6 @@ export default function ClientAssign() {
     });
   });
 
-  if (!patient) return <div className="card">Patient not found.</div>;
-
   const setItemByEx = (exerciseName, change) => {
     setItems(currentItems => {
       const idx = currentItems.findIndex(i => i.ex === exerciseName);
@@ -165,6 +172,8 @@ export default function ClientAssign() {
     });
   }, [items, searchQuery, activeCategory]);
 
+  if (!patient) return <div className="card">Patient not found.</div>;
+
   const handleAddCustom = e => {
     e.preventDefault();
     const name = customName.trim();
@@ -191,43 +200,70 @@ export default function ClientAssign() {
     toast(`Added "${name}" to exercise plan!`);
   };
 
-  const handleAiGenerate = e => {
+  const handleAiGenerate = async e => {
     e.preventDefault();
-    const prompt = aiPrompt.trim();
-    if (!prompt) return;
+    const brief = aiPrompt.trim();
+    if (!brief || !aiConsent) return;
 
     setAiGenerating(true);
-    setTimeout(() => {
-      const generatedName = prompt.split(' ')[0] ? `${prompt.charAt(0).toUpperCase() + prompt.slice(1)}` : 'Therapeutic Movement';
-      const isArm = prompt.toLowerCase().includes('shoulder') || prompt.toLowerCase().includes('arm');
-      const isAnkle = prompt.toLowerCase().includes('heel') || prompt.toLowerCase().includes('calf');
-      const isHip = prompt.toLowerCase().includes('toe') || prompt.toLowerCase().includes('hip');
-      const targetDeg = isArm ? 75 : isHip ? 60 : isAnkle ? 25 : 45;
-
-      saveCustomExercise({
-        name: generatedName,
-        category: 'AI Generated Protocol',
-        primaryJoint: isArm ? 'shoulder' : isHip ? 'hip' : isAnkle ? 'ankle' : 'knee',
-        defaultTargetDeg: targetDeg,
-        cameraView: isArm ? 'front' : 'side',
-        instructions: [`Focus on controlled form: ${prompt}.`, 'Move slowly and stop if you experience sharp pain.'],
-        createdAt: new Date().toISOString(),
+    setAiError('');
+    try {
+      const draft = await connectedApi('ai/drafts', {
+        brief,
+        reference: aiReference.trim() || 'Kisner & Colby, Therapeutic Exercise, 6th edition (2012)',
+        referenceNotes: aiReferenceNotes.trim() || `Prescribed clinical exercise rationale for: ${brief}`,
+        consent: true,
       });
-
-      const refs = approvedReferences(generatedName);
-      setItemByEx(generatedName, {
-        checked: true,
-        targetExcursionDeg: targetDeg,
-        targetReps: 5,
-        note: `AI Protocol: ${prompt}`,
-        referenceVersionId: refs[0]?.versionId || '',
-      });
-
+      setAiDraft(draft);
+    } catch (cause) {
+      setAiError(cause.message || 'AI drafting failed. Check backend connection and Gemini configuration.');
+    } finally {
       setAiGenerating(false);
-      setShowAiGenModal(false);
-      setAiPrompt('');
-      toast(`AI generated protocol for "${generatedName}" added to plan!`);
-    }, 700);
+    }
+  };
+
+  const approveAiDraftAndAdd = async () => {
+    if (!aiDraft?.exercise) return;
+    const name = aiDraft.exercise.name;
+
+    try {
+      if (aiDraft._id) {
+        await connectedApi(`ai/drafts/${aiDraft._id}/review`, {
+          status: 'reviewed',
+          note: 'Approved by prescribing clinician for patient plan inclusion.',
+        }).catch(() => {});
+      }
+    } catch {
+      // Non-blocking if offline/local
+    }
+
+    saveCustomExercise({
+      name,
+      category: 'Clinician Reviewed Protocol',
+      primaryJoint: 'Unmeasured',
+      defaultTargetDeg: 0,
+      cameraView: 'none',
+      instructions: aiDraft.exercise.steps || [],
+      precautions: aiDraft.exercise.precautions || [],
+      videoOnly: true,
+      createdAt: new Date().toISOString(),
+    });
+
+    const refs = approvedReferences(name);
+    setItemByEx(name, {
+      checked: true,
+      targetExcursionDeg: 0,
+      targetReps: 5,
+      t: 45,
+      videoOnly: true,
+      note: aiDraft.exercise.description || 'Follow prescribed form cues.',
+      referenceVersionId: refs[0]?.versionId || '',
+    });
+
+    setShowAiGenModal(false);
+    setAiPrompt('');
+    setAiDraft(null);
+    toast(`Approved "${name}" and added to plan as guided protocol!`);
   };
 
   const build = status => ({
@@ -336,7 +372,7 @@ export default function ClientAssign() {
 
       {/* Plan Settings Card */}
       <div className="card" style={{ marginBottom: 20 }}>
-        <h3 style={{ marginTop: 0, marginBottom: 12 }}>1. Clinical Assessment & Schedule</h3>
+        <h3 style={{ marginTop: 0, marginBottom: 12 }}>1. Clinical Assessment &amp; Schedule</h3>
         <div className="grid">
           <div>
             <label htmlFor="assignment-assessment">Linked Clinical Assessment</label>
@@ -367,7 +403,7 @@ export default function ClientAssign() {
 
           <div>
             <label htmlFor="pn">Plan Name</label>
-            <input id="pn" type="text" value={planName} placeholder="e.g. Mobility & Strengthening Phase 1" onChange={event => setPlanName(event.target.value)} />
+            <input id="pn" type="text" value={planName} placeholder="e.g. Mobility &amp; Strengthening Phase 1" onChange={event => setPlanName(event.target.value)} />
           </div>
 
           <div>
@@ -381,13 +417,13 @@ export default function ClientAssign() {
       <div className="card" style={{ marginBottom: 20, padding: '16px 18px' }}>
         <div className="row sp" style={{ flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
           <div>
-            <h3 style={{ margin: 0 }}>2. Select & Configure Exercises</h3>
+            <h3 style={{ margin: 0 }}>2. Select &amp; Configure Exercises</h3>
             <p className="mut" style={{ margin: '2px 0 0', fontSize: 12 }}>
               Choose from validated clinical exercises, AI generated protocols, or create custom movements.
             </p>
           </div>
           <div className="row" style={{ gap: 8 }}>
-            <button type="button" className="btn s sm" onClick={() => setShowAiGenModal(true)}>
+            <button type="button" className="btn s sm" onClick={() => { setShowAiGenModal(true); setAiDraft(null); setAiError(''); }}>
               <Icon name="plan" size={16} /> + AI Exercise Generator
             </button>
             <button type="button" className="btn s sm" onClick={() => setShowAddModal(true)}>
@@ -448,6 +484,8 @@ export default function ClientAssign() {
             displayedExercises.map(item => {
               const refs = approvedReferences(item.ex);
               const meta = exerciseMeta(item.ex);
+              const cap = getExerciseCapability(item.ex);
+              const isUnmeasured = item.videoOnly || cap.isUnmeasured;
               const isSelected = item.checked;
               const isPreviewOpen = previewingPose === item.ex;
 
@@ -483,7 +521,7 @@ export default function ClientAssign() {
 
                     <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
                       <span className="tag" style={{ fontSize: 11, background: 'var(--soft)', border: '1px solid var(--card-border)' }}>
-                        🎥 {meta.angleLabel} · {meta.cameraView} view
+                        {isUnmeasured ? '📖 Guide-Only (Unmeasured)' : `🎥 ${meta.angleLabel} · ${meta.cameraView} view`}
                       </span>
                       {isSelected && (
                         <span className="tag ok" style={{ fontSize: 11 }}>
@@ -533,19 +571,28 @@ export default function ClientAssign() {
                           />
                         </div>
 
-                        <div>
-                          <label style={{ fontSize: 12, fontWeight: 600 }}>Target ROM / Movement ({meta.angleLabel})</label>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <input
-                              type="number"
-                              min="1"
-                              max="180"
-                              value={item.targetExcursionDeg}
-                              onChange={e => setItemByEx(item.ex, { targetExcursionDeg: Number(e.target.value) })}
-                            />
-                            <span style={{ fontSize: 14, fontWeight: 700 }}>deg°</span>
+                        {isUnmeasured ? (
+                          <div>
+                            <label style={{ fontSize: 12, fontWeight: 600 }}>Tracking Capability</label>
+                            <p className="mut" style={{ margin: '6px 0 0', fontSize: 13 }}>
+                              Guided movement — unmeasured by camera. The patient follows step-by-step instructions.
+                            </p>
                           </div>
-                        </div>
+                        ) : (
+                          <div>
+                            <label style={{ fontSize: 12, fontWeight: 600 }}>Target ROM / Movement ({meta.angleLabel})</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <input
+                                type="number"
+                                min="1"
+                                max="180"
+                                value={item.targetExcursionDeg}
+                                onChange={e => setItemByEx(item.ex, { targetExcursionDeg: Number(e.target.value) })}
+                              />
+                              <span style={{ fontSize: 14, fontWeight: 700 }}>deg°</span>
+                            </div>
+                          </div>
+                        )}
 
                         <div>
                           <label style={{ fontSize: 12, fontWeight: 600 }}>Time Limit (Seconds)</label>
@@ -574,7 +621,7 @@ export default function ClientAssign() {
                       </div>
 
                       <div style={{ marginTop: 10 }}>
-                        <label style={{ fontSize: 12, fontWeight: 600 }}>Clinical Instructions & Form Cues for Patient</label>
+                        <label style={{ fontSize: 12, fontWeight: 600 }}>Clinical Instructions &amp; Form Cues for Patient</label>
                         <textarea
                           rows="2"
                           placeholder="e.g. Move slowly through full range, exhale on effort. Stop if pain occurs."
@@ -594,7 +641,7 @@ export default function ClientAssign() {
 
       {/* Plan Summary & Review Card */}
       <div className="card" style={{ marginTop: 24, padding: '20px 22px' }}>
-        <h3 style={{ marginTop: 0, marginBottom: 8 }}>3. Prescription Summary & Publishing</h3>
+        <h3 style={{ marginTop: 0, marginBottom: 8 }}>3. Prescription Summary &amp; Publishing</h3>
         <p className="mut" style={{ margin: '0 0 16px', fontSize: 13 }}>
           {assessment ? `Linked to assessment v${assessment.version} (${assessment.assessedAt || 'Recent'}).` : 'No assessment selected.'}
           {' '}Publishing generates an immutable version v{(current?.v ?? 0) + 1} for {patient.n}.
@@ -621,6 +668,10 @@ export default function ClientAssign() {
             <span className="mut" style={{ fontSize: 12 }}>Total ~{frequency * selectedItems.reduce((acc, i) => acc + (i.targetReps || 0), 0)} reps weekly</span>
           </div>
         </div>
+
+        <p className="mut" style={{ fontSize: 12, marginBottom: 16 }}>
+          ℹ️ Kineticare Clinical Disclaimer: Camera measurements are biomechanical estimates. AI drafts and customized protocols require prescribing clinician review prior to publishing.
+        </p>
 
         <div className="row" style={{ flexWrap: 'wrap', gap: 10 }}>
           <button className="btn" disabled={busy || !selectedItems.length} onClick={publish} style={{ minWidth: 200 }}>
@@ -649,34 +700,110 @@ export default function ClientAssign() {
             padding: 16,
           }}
         >
-          <div className="card" style={{ maxWidth: 520, width: '100%', padding: '24px 22px' }}>
+          <div className="card" style={{ maxWidth: 540, width: '100%', padding: '24px 22px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="row sp" style={{ marginBottom: 12 }}>
-              <h2 style={{ margin: 0, fontSize: 18 }}>AI Exercise Generator</h2>
+              <h2 style={{ margin: 0, fontSize: 18 }}>AI Exercise Generator (Gemini)</h2>
               <button type="button" className="btn s sm" onClick={() => setShowAiGenModal(false)}>✕</button>
             </div>
-            <p className="mut" style={{ fontSize: 13, marginTop: 0 }}>
-              Describe a rehabilitation exercise or pathology target. The AI engine will configure movement cues, target ROM, and 3D pose tracking.
-            </p>
 
-            <form onSubmit={handleAiGenerate}>
-              <label htmlFor="ai-gen-prompt">Exercise Brief or Movement Name</label>
-              <textarea
-                id="ai-gen-prompt"
-                rows="3"
-                required
-                placeholder="e.g. Standing calf raise for Achilles tendon rehab, 15 degrees ankle excursion"
-                value={aiPrompt}
-                onChange={e => setAiPrompt(e.target.value)}
-                style={{ width: '100%', marginBottom: 14 }}
-              />
+            {aiDraft ? (
+              <div>
+                <div className="row sp" style={{ marginBottom: 8 }}>
+                  <h3 style={{ margin: 0 }}>{aiDraft.exercise?.name}</h3>
+                  <span className="tag warn">Clinician Review Required</span>
+                </div>
+                <p style={{ marginTop: 4, fontSize: 14 }}>{aiDraft.exercise?.description}</p>
 
-              <div className="row sp">
-                <button type="button" className="btn s" onClick={() => setShowAiGenModal(false)}>Cancel</button>
-                <button type="submit" className="btn" disabled={aiGenerating || !aiPrompt.trim()}>
-                  {aiGenerating ? 'Generating…' : 'Generate & Add to Plan'}
-                </button>
+                <h4>Prescribed Movement Steps</h4>
+                <ol style={{ paddingLeft: 20, fontSize: 13, lineHeight: 1.5 }}>
+                  {aiDraft.exercise?.steps?.map((step, idx) => (
+                    <li key={idx} style={{ marginBottom: 4 }}>{step}</li>
+                  ))}
+                </ol>
+
+                <h4>Precautions to Verify</h4>
+                <ul style={{ paddingLeft: 20, fontSize: 13, lineHeight: 1.5, color: 'var(--warn)' }}>
+                  {aiDraft.exercise?.precautions?.map((prec, idx) => (
+                    <li key={idx} style={{ marginBottom: 4 }}>{prec}</li>
+                  ))}
+                </ul>
+
+                <p className="mut" style={{ fontSize: 12 }}>
+                  Source: {aiDraft.reference} · Model: {aiDraft.model || 'Gemini'}
+                </p>
+
+                <div className="card" style={{ background: 'var(--soft)', fontSize: 12, margin: '14px 0' }}>
+                  ℹ️ <b>Capability Note:</b> AI generated movements are added to the patient’s plan as guided protocols with instructions and demonstration. Real-time joint angle camera tracking is disabled for novel movements to maintain diagnostic validity.
+                </div>
+
+                <div className="row sp" style={{ gap: 8 }}>
+                  <button type="button" className="btn s" onClick={() => setAiDraft(null)}>Discard Draft</button>
+                  <button type="button" className="btn" onClick={approveAiDraftAndAdd}>Approve &amp; Add to Plan</button>
+                </div>
               </div>
-            </form>
+            ) : (
+              <form onSubmit={handleAiGenerate}>
+                <p className="mut" style={{ fontSize: 13, marginTop: 0 }}>
+                  Draft evidence-grounded exercise education for clinician review. Drafts are verified before being added to the patient’s plan.
+                </p>
+
+                {aiError && (
+                  <div className="session-status" role="alert" style={{ marginBottom: 12 }}>
+                    {aiError}
+                  </div>
+                )}
+
+                <label htmlFor="ai-gen-brief">Exercise Brief or Movement Goal</label>
+                <textarea
+                  id="ai-gen-brief"
+                  rows="2"
+                  required
+                  placeholder="e.g. Scapular retractions and gentle elevation within 60 degrees pain-free range"
+                  value={aiPrompt}
+                  onChange={e => setAiPrompt(e.target.value)}
+                  style={{ width: '100%', marginBottom: 12 }}
+                />
+
+                <label htmlFor="ai-gen-reference">Clinical Reference &amp; Edition</label>
+                <input
+                  id="ai-gen-reference"
+                  type="text"
+                  required
+                  value={aiReference}
+                  onChange={e => setAiReference(e.target.value)}
+                  style={{ width: '100%', marginBottom: 12 }}
+                />
+
+                <label htmlFor="ai-gen-notes">Clinician Reference Summary / Rationale</label>
+                <textarea
+                  id="ai-gen-notes"
+                  rows="3"
+                  required
+                  placeholder="Summarize the relevant biomechanical principles, contraindications, or movement cues..."
+                  value={aiReferenceNotes}
+                  onChange={e => setAiReferenceNotes(e.target.value)}
+                  style={{ width: '100%', marginBottom: 12 }}
+                />
+
+                <label className="check-label" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '10px 0 16px', fontSize: 12 }}>
+                  <input
+                    type="checkbox"
+                    checked={aiConsent}
+                    onChange={e => setAiConsent(e.target.checked)}
+                  />
+                  <span>
+                    I confirm no identifiable patient data is included in this brief, and consent to query Gemini for educational exercise drafting.
+                  </span>
+                </label>
+
+                <div className="row sp">
+                  <button type="button" className="btn s" onClick={() => setShowAiGenModal(false)}>Cancel</button>
+                  <button type="submit" className="btn" disabled={aiGenerating || !aiPrompt.trim() || !aiConsent}>
+                    {aiGenerating ? 'Generating Draft…' : 'Generate Exercise Draft'}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

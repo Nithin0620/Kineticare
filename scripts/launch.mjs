@@ -100,8 +100,8 @@ try {
   await Promise.all([
     waitUntilReady(`http://127.0.0.1:${backendPort}/api/health`),
     waitUntilReady(`http://127.0.0.1:${frontendPort}/`),
-    waitUntilReady(`http://127.0.0.1:${frontendPort}/api/health`),
   ]);
+  await waitUntilReady(`http://127.0.0.1:${frontendPort}/api/health`);
   if (!startup.signal.aborted) console.log(`\nKineticare is ready: http://localhost:${frontendPort}\nBackend: http://127.0.0.1:${backendPort}/api/health\nPress Ctrl+C to stop both servers.\n`);
 } catch (error) {
   if (!startup.signal.aborted) {

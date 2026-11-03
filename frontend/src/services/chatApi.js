@@ -30,6 +30,32 @@ export async function getChatStatus() {
   }
 }
 
+export async function getChatHistory() {
+  try {
+    const res = await fetch(`${API_BASE}/api/chat/history`, {
+      headers: await getHeaders(),
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+    return { messages: [] };
+  } catch {
+    return { messages: [] };
+  }
+}
+
+export async function clearChatHistory() {
+  try {
+    const res = await fetch(`${API_BASE}/api/chat/history`, {
+      method: 'DELETE',
+      headers: await getHeaders(),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function sendChat(messages, { patientId = null } = {}) {
   const res = await fetch(`${API_BASE}/api/chat`, {
     method: 'POST',

@@ -1,97 +1,57 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useRecords } from '../records/recordsContext';
 import { useAuth } from '../auth/authContext';
-import { getChatStatus, sendChat } from '../services/chatApi';
+import { getChatStatus, sendChat, getChatHistory, clearChatHistory } from '../services/chatApi';
 import Icon from '../components/Icon';
+import FormattedAiMessage from '../components/FormattedAiMessage';
 import './PatientAiPhysio.css';
 
-const TRIAGE_CATEGORIES = [
-  { id: 'all', label: 'All Guidance', icon: 'sparkle' },
-  { id: 'form', label: 'Form & Biomechanics', icon: 'compass', prompt: 'According to Kisner & Colby exercise principles, what are the exact biomechanical alignment cues and common substitutions to avoid during my exercises?' },
-  { id: 'pain', label: 'Pain & Soreness Check', icon: 'pulse', prompt: 'I feel some soreness after my session. Applying Kisner & Colby soreness rules, help me differentiate delayed-onset muscle soreness (DOMS) from joint inflammation or strain.' },
-  { id: 'phases', label: 'Tissue Healing & Phases', icon: 'shield', prompt: 'Explain the three phases of tissue healing (acute, subacute, chronic) from Kisner & Colby and how my rehabilitation exercise intensity progresses.' },
-  { id: 'warmup', label: 'Warm-Up & Mobility', icon: 'zap', prompt: 'Provide a tailored dynamic warm-up and mobility routine for my assigned rehabilitation exercises based on therapeutic exercise protocols.' },
-  { id: 'prog', label: 'Plan & Score Review', icon: 'target', prompt: 'How is my exercise score calculated and what should I focus on to improve my movement excursion?' },
+const CONVERSATION_STARTERS = [
+  {
+    id: 'form',
+    label: 'Form & Biomechanics',
+    icon: 'compass',
+    desc: 'Alignment cues & common substitutions to avoid',
+    prompt: 'According to Kisner & Colby exercise principles, what are the exact biomechanical alignment cues and common substitutions to avoid during my exercises?',
+  },
+  {
+    id: 'pain',
+    label: 'Pain & Soreness Check',
+    icon: 'pulse',
+    desc: 'Differentiating DOMS from joint inflammation or strain',
+    prompt: 'I feel some soreness after my session. Applying Kisner & Colby soreness rules, help me differentiate delayed-onset muscle soreness (DOMS) from joint inflammation or strain.',
+  },
+  {
+    id: 'phases',
+    label: 'Tissue Healing & Recovery',
+    icon: 'shield',
+    desc: 'Acute, subacute, and chronic exercise progression',
+    prompt: 'Explain the three phases of tissue healing (acute, subacute, chronic) from Kisner & Colby and how my rehabilitation exercise intensity progresses.',
+  },
+  {
+    id: 'warmup',
+    label: 'Warm-Up & Mobility',
+    icon: 'zap',
+    desc: 'Tailored dynamic preparation for assigned exercises',
+    prompt: 'Provide a tailored dynamic warm-up and mobility routine for my assigned rehabilitation exercises based on therapeutic exercise protocols.',
+  },
+  {
+    id: 'prog',
+    label: 'Plan & Score Review',
+    icon: 'target',
+    desc: 'Understanding how excursion scores are calculated',
+    prompt: 'How is my exercise excursion score calculated and what should I focus on to improve my movement quality?',
+  },
 ];
 
-function formatInlineText(text) {
-  if (!text) return '';
-  const parts = [];
-  let lastIdx = 0;
-  const boldRegex = /\*\*(.*?)\*\*/g;
-  let match;
-  while ((match = boldRegex.exec(text)) !== null) {
-    if (match.index > lastIdx) {
-      parts.push(text.slice(lastIdx, match.index));
-    }
-    parts.push(<strong key={match.index}>{match[1]}</strong>);
-    lastIdx = boldRegex.lastIndex;
-  }
-  if (lastIdx < text.length) {
-    parts.push(text.slice(lastIdx));
-  }
-  return parts.length ? parts : text;
-}
-
-function FormattedMessage({ content }) {
-  if (!content) return null;
-  const blocks = content.split(/\n\s*\n/);
-
-  return (
-    <div className="physio-formatted-content">
-      {blocks.map((block, bIdx) => {
-        const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
-        if (!lines.length) return null;
-
-        // Check if block is a list of bullets
-        const isBulletList = lines.every(l => /^[-*•]\s+/.test(l));
-        if (isBulletList) {
-          return (
-            <ul key={bIdx} className="physio-bubble-list">
-              {lines.map((line, lIdx) => {
-                const cleaned = line.replace(/^[-*•]\s+/, '');
-                return <li key={lIdx}>{formatInlineText(cleaned)}</li>;
-              })}
-            </ul>
-          );
-        }
-
-        // Check if single line is a numbered schema section heading
-        const sectionMatch = lines[0].match(/^([1-3]\))\s*(.*)$/);
-        if (sectionMatch && lines.length === 1) {
-          return (
-            <div key={bIdx} className="physio-section-heading">
-              <span className="physio-section-badge">{sectionMatch[1]}</span>
-              <span className="physio-section-title">{formatInlineText(sectionMatch[2])}</span>
-            </div>
-          );
-        }
-
-        return (
-          <p key={bIdx} className="physio-bubble-p">
-            {lines.map((line, lIdx) => (
-              <span key={lIdx}>
-                {formatInlineText(line)}
-                {lIdx < lines.length - 1 && <br />}
-              </span>
-            ))}
-          </p>
-        );
-      })}
-    </div>
-  );
-}
-
 export default function PatientAiPhysio() {
-  const nav = useNavigate();
   const { user } = useAuth();
   const { patientId, patientPlan, assignment, sessions, feedback } = useRecords();
 
   const plan = patientPlan(patientId);
   const activeAssignment = assignment(patientId);
-  const sessionList = sessions(patientId);
-  const feedbackList = feedback(patientId);
+  const sessionList = sessions(patientId) || [];
+  const feedbackList = feedback(patientId) || [];
 
   const [hasConsent, setHasConsent] = useState(() => {
     try {
@@ -106,7 +66,7 @@ export default function PatientAiPhysio() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [activeCategory, setActiveCategory] = useState('all');
+  const [contextExpanded, setContextExpanded] = useState(false);
 
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
@@ -116,6 +76,11 @@ export default function PatientAiPhysio() {
     let active = true;
     getChatStatus().then(st => {
       if (active) setConfigured(st.configured);
+    });
+    getChatHistory().then(res => {
+      if (active && Array.isArray(res?.messages) && res.messages.length > 0) {
+        setMessages(res.messages);
+      }
     });
     return () => { active = false; };
   }, []);
@@ -127,8 +92,15 @@ export default function PatientAiPhysio() {
   const giveConsent = () => {
     try {
       localStorage.setItem('kineticare_ai_chat_consent', 'true');
-    } catch {}
+    } catch {
+      // Storage unavailable or disabled
+    }
     setHasConsent(true);
+  };
+
+  const handleClear = async () => {
+    await clearChatHistory();
+    setMessages([]);
   };
 
   const handleSend = async (textToSend, baseMessages = null) => {
@@ -150,12 +122,34 @@ export default function PatientAiPhysio() {
         role: m.role,
         content: m.role === 'assistant' && m.content.length > 7900 ? m.content.slice(0, 7900) : m.content,
       }));
-      const res = await sendChat(payloadMessages, { patientId });
-      setMessages([...nextMessages, { role: 'assistant', content: res.reply }]);
+      const res = await sendChat(payloadMessages);
+      const fullReply = res.reply || '';
+      // Simulate token streaming by revealing text progressively
+      const CHUNK = 18;
+      let revealed = 0;
+      const streamMsg = { role: 'assistant', content: '' };
+      setMessages(prev => [...prev, streamMsg]);
+      setLoading(false);
+      await new Promise(resolve => {
+        const tick = () => {
+          revealed = Math.min(revealed + CHUNK, fullReply.length);
+          setMessages(prev => {
+            const updated = [...prev];
+            updated[updated.length - 1] = { role: 'assistant', content: fullReply.slice(0, revealed) };
+            return updated;
+          });
+          if (revealed < fullReply.length) {
+            setTimeout(tick, 22);
+          } else {
+            resolve();
+          }
+        };
+        tick();
+      });
     } catch (err) {
       setError(err.message || 'Unable to connect to Kira.');
-    } finally {
       setLoading(false);
+    } finally {
       sendingRef.current = false;
     }
   };
@@ -167,146 +161,171 @@ export default function PatientAiPhysio() {
     }
   };
 
-  const assignedNames = (plan?.items || []).map(i => i.name || i.ex || 'Exercise');
-  const suggestions = [
-    assignedNames.length
-      ? `Kisner & Colby form cues for ${assignedNames[0]}`
-      : 'Kisner & Colby form cues for bilateral mini-squat',
-    'How does Kisner & Colby define delayed-onset muscle soreness (DOMS)?',
-    'What breathing pattern prevents the Valsalva maneuver during reps?',
-    'What are common compensatory substitutions during squats?',
-  ];
-
   return (
     <div className="physio-page">
-      {/* Header */}
-      <div className="physio-header">
-        <div className="physio-header-title">
-          <div className="physio-avatar-mark kira" aria-hidden="true">
-            <Icon name="kira" size={22} color="#ffffff" />
+      {/* 1. COMPACT PROFESSIONAL HEADER */}
+      <header className="physio-header">
+        <div className="physio-header-identity">
+          <div className="physio-avatar-mark">
+            <Icon name="kira" size={20} color="#ffffff" />
           </div>
           <div className="physio-header-text">
             <div className="physio-title-row">
-              <h1>Kira</h1>
-              <span className="physio-role-chip">AI Physio</span>
+              <h1>Kira — AI Physio Assistant</h1>
             </div>
-            <p>
-              <span className="physio-status-dot" />
-              {configured !== false ? 'Active · Grounded in Kisner & Colby (6th Ed.)' : 'Offline'}
-            </p>
+            <p>Clinical rehabilitation guidance &amp; movement science</p>
           </div>
         </div>
+
         <div className="physio-header-actions">
           {messages.length > 0 && (
             <button
               type="button"
-              className="physio-btn-subtle"
-              onClick={() => { setMessages([]); setError(null); }}
-              title="Clear conversation"
+              className="physio-clear-btn"
+              onClick={handleClear}
+              title="Reset conversation"
             >
-              <Icon name="trash" size={13} />
-              <span>Clear</span>
+              Clear chat
             </button>
           )}
-          <button
-            type="button"
-            className="physio-btn-subtle"
-            onClick={() => nav('/patient/home')}
-            title="Return home"
-          >
-            <Icon name="home" size={13} />
-            <span>Home</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Meta Bar: Foundation + Active Plan */}
-      <div className="physio-meta-bar">
-        <div className="physio-meta-item">
-          <Icon name="book" size={14} color="var(--pri, #6454e8)" />
-          <span>Foundation: <strong>Kisner & Colby (6th Ed.)</strong></span>
-        </div>
-        <div className="physio-meta-divider" />
-        <div className="physio-meta-item">
-          <Icon name="workout" size={14} color="var(--pri, #6454e8)" />
-          <span>Plan: <strong>{assignedNames.length ? assignedNames.join(', ') : 'Self-guided'}</strong></span>
-          <span className="physio-session-tag">{sessionList.length} done</span>
-        </div>
-      </div>
-
-      {/* Consent Screen */}
-      {!hasConsent && (
-        <div className="physio-consent-screen">
-          <div className="physio-avatar-mark kira" style={{ margin: '0 auto 14px' }}>
-            <Icon name="kira" size={26} color="#ffffff" />
+          <div className={`physio-status-chip ${configured ? 'online' : ''}`}>
+            <span className={`physio-dot ${configured ? 'green' : 'gray'}`} />
+            <span>{configured ? 'Connected · Kisner & Colby Base' : 'Offline / Demo'}</span>
           </div>
-          <h2>Meet Kira · Your AI Physio Companion</h2>
-          <p>
-            Kira provides 24/7 rehabilitation guidance, biomechanics cueing, and symptom triage strictly grounded in <strong>Kisner & Colby, Therapeutic Exercise: Foundations and Techniques (6th Ed.)</strong>.
-          </p>
-          <ul>
-            <li>Analyzes your assigned movements and historical scores for personalized advice.</li>
-            <li>Strictly private: no camera feeds, video files, or emails are ever shared.</li>
-            <li>Evidence-backed clinical physical therapy protocols designed for recovery.</li>
-          </ul>
-          <button type="button" className="btn" onClick={giveConsent}>
-            Agree & Start Consultation
-          </button>
         </div>
-      )}
+      </header>
 
-      {/* Main Consultation Room */}
-      {hasConsent && (
-        <>
-          {/* Triage Pills */}
-          <div className="physio-triage-tabs" role="tablist" aria-label="Clinical topics">
-            {TRIAGE_CATEGORIES.map(cat => (
+      {/* 2. COLLAPSIBLE CLINICAL CONTEXT PANEL */}
+      <section className="physio-context-panel" aria-label="Attached patient care context">
+        <button
+          type="button"
+          className="physio-context-bar"
+          onClick={() => setContextExpanded(!contextExpanded)}
+          aria-expanded={contextExpanded}
+        >
+          <div className="physio-context-summary">
+            <span>🩺</span>
+            <strong>Clinical Context:</strong>
+            <span>{plan?.name || 'Self-Guided Mobility Starter'}</span>
+            <span className="physio-context-badge">
+              {activeAssignment?.by ? `Dr. ${activeAssignment.by}` : 'Self-Guided'}
+            </span>
+            <span>· {sessionList.length} session{sessionList.length === 1 ? '' : 's'}</span>
+          </div>
+          <span className="physio-context-toggle-icon">
+            {contextExpanded ? 'Hide Details ▲' : 'View Details ▼'}
+          </span>
+        </button>
+
+        {contextExpanded && (
+          <div className="physio-context-drawer">
+            <div className="physio-context-grid">
+              <div className="physio-context-item">
+                <span className="physio-context-k">ASSIGNED CARE PLAN</span>
+                <span className="physio-context-v">
+                  {plan?.name || 'Self-Guided Mobility Starter'} (v{plan?.v || 1})
+                </span>
+              </div>
+              <div className="physio-context-item">
+                <span className="physio-context-k">PRESCRIBED EXERCISES</span>
+                <span className="physio-context-v">
+                  {plan?.items?.length ? plan.items.map(i => i.ex).join(', ') : 'None active'}
+                </span>
+              </div>
+              <div className="physio-context-item">
+                <span className="physio-context-k">COMPLETED SESSIONS</span>
+                <span className="physio-context-v">
+                  {sessionList.length} recorded session{sessionList.length === 1 ? '' : 's'}
+                </span>
+              </div>
+              <div className="physio-context-item">
+                <span className="physio-context-k">SUPERVISING CLINICIAN</span>
+                <span className="physio-context-v">
+                  {activeAssignment?.by ? `Dr. ${activeAssignment.by}` : 'Unassigned (Self-Guided)'}
+                </span>
+              </div>
+            </div>
+            {feedbackList?.length > 0 && (
+              <div className="physio-clinician-note-banner">
+                <Icon name="bell" size={14} color="var(--pri)" />
+                <span>
+                  <strong>Latest Clinician Note:</strong> &ldquo;{feedbackList[feedbackList.length - 1].message}&rdquo;
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* 3. MAIN CONVERSATION ROOM */}
+      <main className="physio-chat-box">
+        {!hasConsent ? (
+          <div className="physio-consent-screen">
+            <div className="physio-consent-card">
+              <div className="physio-consent-icon">
+                <Icon name="shield" size={32} color="var(--pri)" />
+              </div>
+              <h2>AI Physio Assistant Safety &amp; Privacy Notice</h2>
+              <p>
+                Kira is an educational AI rehabilitation companion grounded in established therapeutic exercise principles (Kisner &amp; Colby).
+              </p>
+              <ul className="physio-consent-bullets">
+                <li>
+                  <strong>Not a substitute for emergency care:</strong> If you experience acute chest pain, joint locking, or sudden neurological weakness, contact a medical emergency professional immediately.
+                </li>
+                <li>
+                  <strong>Clinical context scope:</strong> Your assigned exercises, repetition counts, and biomechanical scores are referenced only to tailor guidance in this conversation.
+                </li>
+                <li>
+                  <strong>Zero raw video:</strong> No video or audio is ever transmitted. Queries are processed with zero-retention parameters.
+                </li>
+              </ul>
               <button
-                key={cat.id}
                 type="button"
-                className={`physio-triage-pill ${activeCategory === cat.id ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveCategory(cat.id);
-                  if (cat.prompt) handleSend(cat.prompt);
-                }}
+                className="btn physio-consent-btn"
+                onClick={giveConsent}
               >
-                <Icon name={cat.icon} size={14} />
-                <span>{cat.label}</span>
+                I Understand &amp; Agree — Start Assistant
               </button>
-            ))}
+            </div>
           </div>
-
-          <div className="physio-chat-box">
+        ) : (
+          <>
+            {/* Scrollable Message History */}
             <div className="physio-messages-area">
               {messages.length === 0 && (
-                <div className="physio-welcome-card">
-                  <div className="physio-welcome-header">
-                    <div className="physio-welcome-avatar">
-                      <Icon name="kira" size={22} color="#ffffff" />
-                    </div>
-                    <div>
-                      <h3>Hi {user?.displayName?.split(' ')[0] || 'there'}! I'm Kira, your AI Physio.</h3>
-                      <p>
-                        I'm here to support your rehabilitation using evidence-backed movement principles from <em>Kisner & Colby Therapeutic Exercise</em>. How does your body feel today?
-                      </p>
-                    </div>
+                <div className="physio-empty-welcome">
+                  <div className="physio-empty-avatar">
+                    <Icon name="kira" size={26} color="#ffffff" />
                   </div>
-                  <div className="physio-suggestion-grid">
-                    {suggestions.map((sug, idx) => (
+                  <h3>How can Kira help your recovery today?</h3>
+                  <p>
+                    I am connected to your exercise plan and therapeutic exercise textbooks. Ask me about movement form, soreness rules, warm-up exercises, or how your excursion scores are calculated.
+                  </p>
+
+                  <div className="physio-suggestions-list">
+                    {CONVERSATION_STARTERS.map(c => (
                       <button
-                        key={idx}
+                        key={c.id}
                         type="button"
-                        className="physio-suggestion-card"
-                        onClick={() => handleSend(sug)}
+                        className="physio-starter-card"
+                        onClick={() => handleSend(c.prompt)}
                       >
-                        <Icon name="sparkle" size={13} color="var(--pri, #6454e8)" />
-                        <span>{sug}</span>
+                        <div className="starter-icon-wrap">
+                          <Icon name={c.icon} size={16} color="var(--pri)" />
+                        </div>
+                        <div className="starter-text">
+                          <div className="starter-title">{c.label}</div>
+                          <div className="starter-desc">{c.desc}</div>
+                        </div>
+                        <span className="starter-arrow" aria-hidden="true">→</span>
                       </button>
                     ))}
                   </div>
                 </div>
               )}
 
+              {/* Chat Message History */}
               {messages.map((m, idx) => (
                 <div key={idx} className={`physio-msg-row ${m.role}`}>
                   <div className="physio-msg-avatar" aria-hidden="true">
@@ -320,11 +339,11 @@ export default function PatientAiPhysio() {
                     {m.role === 'assistant' && (
                       <div className="physio-msg-author">
                         <span className="physio-author-name">Kira</span>
-                        <span className="physio-author-badge">AI Physio</span>
+                        <span className="physio-author-badge">Clinical AI</span>
                       </div>
                     )}
                     <div className="physio-bubble">
-                      <FormattedMessage content={m.content} />
+                      <FormattedAiMessage content={m.content} role={m.role} />
                     </div>
                   </div>
                 </div>
@@ -338,7 +357,7 @@ export default function PatientAiPhysio() {
                   <div className="physio-msg-body">
                     <div className="physio-msg-author">
                       <span className="physio-author-name">Kira</span>
-                      <span className="physio-author-badge">Thinking...</span>
+                      <span className="physio-author-badge">Analyzing biomechanics...</span>
                     </div>
                     <div className="physio-bubble typing">
                       <div className="physio-typing-indicator" aria-label="Kira is typing">
@@ -359,9 +378,8 @@ export default function PatientAiPhysio() {
                     onClick={() => {
                       const lastUserIdx = messages.findLastIndex(m => m.role === 'user');
                       if (lastUserIdx !== -1) {
-                        const failedText = messages[lastUserIdx].content;
-                        const withoutFailed = messages.slice(0, lastUserIdx);
-                        handleSend(failedText, withoutFailed);
+                        const prior = messages.slice(0, lastUserIdx);
+                        handleSend(messages[lastUserIdx].content, prior);
                       }
                     }}
                   >
@@ -373,41 +391,38 @@ export default function PatientAiPhysio() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Form */}
-            <div className="physio-form-container">
-              <form
-                className="physio-input-wrap"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSend();
-                }}
-              >
+            {/* 4. ANCHORED MESSAGE COMPOSER */}
+            <div className="physio-composer-area">
+              <div className="physio-input-wrap">
                 <textarea
                   ref={textareaRef}
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
+                  onChange={e => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Ask Kira about Kisner & Colby form cues, soreness, or exercise tips..."
-                  rows={1}
+                  placeholder="Ask Kira about your movement form, soreness rules, or recovery..."
+                  rows={2}
                   maxLength={1500}
                   disabled={loading}
+                  aria-label="Message to Kira"
                 />
                 <button
-                  type="submit"
+                  type="button"
                   className="physio-send-btn"
+                  onClick={() => handleSend()}
                   disabled={!input.trim() || loading}
                   aria-label="Send message"
+                  title="Send message (Enter)"
                 >
-                  <Icon name="send" size={17} color="#ffffff" />
+                  <Icon name="send" size={18} color="#ffffff" />
                 </button>
-              </form>
-              <div className="physio-disclaimer">
-                Kira provides rehabilitation & exercise guidance grounded in Kisner & Colby protocols. If you experience severe tearing pain, numbness, or dizziness, stop immediately and seek medical care.
+              </div>
+              <div className="physio-disclaimer-subtext">
+                Educational guidance only. Prescribed rehabilitation targets are managed by your clinician.
               </div>
             </div>
-          </div>
-        </>
-      )}
+          </>
+        )}
+      </main>
     </div>
   );
 }

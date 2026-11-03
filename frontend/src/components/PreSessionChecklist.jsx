@@ -1,13 +1,15 @@
+import './PreSessionChecklist.css';
+
 /**
  * PreSessionChecklist component.
- * Displays a 4-point real-time pre-session checklist:
+ * Displays a compact, restrained 4-point real-time pre-session checklist:
  * 1. Required landmarks visible
  * 2. Framing & safety margins
  * 3. Camera view orientation (side vs front)
  * 4. Camera frame rate
  *
- * Provides prominent human-readable instructions when any check fails,
- * blocking calibration until the patient is correctly positioned.
+ * Keeps the camera preview as the primary focus while presenting
+ * clear overall status and one prominent, actionable next step.
  */
 export default function PreSessionChecklist({
   validation,
@@ -24,114 +26,68 @@ export default function PreSessionChecklist({
   const items = [
     {
       id: 'landmarks',
-      label: 'Body landmarks visible',
+      label: 'Body landmarks',
       check: checks?.landmarks,
-      hint: 'Required joints above confidence threshold',
+      passedLabel: 'Full body visible',
+      failingLabel: checks?.landmarks?.code === 'LANDMARKS_MISSING' ? 'Hips/arms out of frame' : (checks?.landmarks?.code || 'Not detected'),
     },
     {
       id: 'framing',
-      label: 'Framing & borders',
+      label: 'Frame borders',
       check: checks?.framing,
-      hint: 'Body inside camera view with margin',
+      passedLabel: 'Centered with margins',
+      failingLabel: checks?.framing?.code === 'MARGIN_BOTTOM' ? 'Touching bottom border' : (checks?.framing?.code || 'Check frame edge'),
     },
     {
       id: 'orientation',
-      label: 'Camera orientation',
+      label: 'Camera angle',
       check: checks?.orientation,
-      hint: checks?.orientation?.code === 'VIEW_OK' ? 'Correct viewing angle' : 'Side or front view match',
+      passedLabel: checks?.orientation?.code === 'VIEW_OK' ? 'Correct orientation' : 'View aligned',
+      failingLabel: checks?.orientation?.code === 'VIEW_MISMATCH_FRONT' ? 'Face camera directly' : (checks?.orientation?.code === 'VIEW_MISMATCH_SIDE' ? 'Turn sideways' : 'Angle mismatch'),
     },
     {
       id: 'frameRate',
-      label: 'Camera speed & lighting',
+      label: 'Lighting & FPS',
       check: checks?.frameRate,
-      hint: checks?.frameRate?.fps ? `${checks.frameRate.fps} fps (min 15)` : 'At least 15 fps required',
+      passedLabel: `${checks?.frameRate?.fps || 30} FPS · Good light`,
+      failingLabel: checks?.frameRate?.fps ? `Low FPS (${checks.frameRate.fps})` : 'FPS checking...',
     },
   ];
 
   return (
-    <div className="card pre-session-checklist" style={{ margin: '14px 0', border: allOk ? '1px solid rgba(35, 121, 66, 0.3)' : '1px solid rgba(148, 96, 32, 0.3)' }}>
-      <div className="row sp" style={{ marginBottom: 8 }}>
-        <h3 style={{ margin: 0, fontSize: 15 }}>Position & Camera Checklist</h3>
-        <span className={`tag ${allOk ? 'ok' : 'warn'}`}>
-          {allOk ? 'Ready to calibrate' : 'Positioning required'}
+    <div className="camera-readiness-panel" role="region" aria-label="Camera readiness and positioning checks">
+      {/* Top Header Row: Status badge and title */}
+      <div className="readiness-header-row">
+        <div className="readiness-title-wrap">
+          <span className="readiness-icon" aria-hidden="true">📷</span>
+          <h4 className="readiness-title">Positioning & Camera Setup</h4>
+        </div>
+        <span className={`readiness-status-badge ${allOk ? 'ready' : 'required'}`}>
+          {allOk ? '✓ Ready to Calibrate' : '⚠️ Positioning Required'}
         </span>
       </div>
 
-      <p className="mut" style={{ fontSize: 12, margin: '0 0 10px' }}>
-        Kineticare verifies your camera angle and position before starting to ensure accurate movement tracking.
-      </p>
-
-      {/* Real-time Checklist Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
-        {items.map(item => {
-          const isPassed = item.check?.ok;
-          return (
-            <div
-              key={item.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '8px 10px',
-                borderRadius: 8,
-                background: isPassed ? 'var(--okb)' : 'var(--warnb)',
-                border: `1px solid ${isPassed ? 'rgba(35, 121, 66, 0.2)' : 'rgba(148, 96, 32, 0.2)'}`,
-              }}
-            >
-              <span style={{ fontSize: 14 }}>{isPassed ? '✓' : '⚠️'}</span>
-              <div style={{ fontSize: 11, lineHeight: 1.25 }}>
-                <b style={{ color: isPassed ? 'var(--ok)' : 'var(--warn)' }}>{item.label}</b>
-                <span className="mut" style={{ display: 'block', fontSize: 10 }}>{item.check?.ok ? 'Passed' : item.check?.code || 'Checking...'}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Human-readable instruction alert */}
+      {/* Primary Actionable Instruction Banner */}
       {failingCheck && (
-        <div
-          role="alert"
-          style={{
-            marginTop: 12,
-            padding: '10px 14px',
-            background: 'var(--warnb)',
-            color: 'var(--warn)',
-            borderRadius: 8,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            fontSize: 13,
-            fontWeight: 500,
-          }}
-        >
-          <span style={{ fontSize: 18 }}>👉</span>
-          <span>{failingCheck.message || message}</span>
+        <div className="readiness-instruction-banner warn" role="alert">
+          <span className="instruction-arrow" aria-hidden="true">👉</span>
+          <span className="instruction-text">{failingCheck.message || message}</span>
         </div>
       )}
 
-      {/* Ready banner when all checks pass */}
+      {/* When All Checks Pass: Ready Banner with Calibrate Button */}
       {allOk && calibrationStatus !== 'collecting' && calibrationStatus !== 'ready' && (
-        <div
-          role="status"
-          style={{
-            marginTop: 12,
-            padding: '10px 14px',
-            background: 'var(--okb)',
-            color: 'var(--ok)',
-            borderRadius: 8,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 10,
-            fontSize: 13,
-          }}
-        >
-          <span>✓ Stance verified. Hold still for 2-second resting position setup.</span>
+        <div className="readiness-instruction-banner ok" role="status">
+          <div className="instruction-content">
+            <span className="instruction-check" aria-hidden="true">✓</span>
+            <span className="instruction-text">
+              Stance verified. Hold still for 2-second baseline measurement.
+            </span>
+          </div>
           {onRetryCalibration && (
             <button
-              className="btn sm"
-              style={{ flexShrink: 0 }}
+              type="button"
+              className="readiness-calibrate-btn"
               disabled={!canCalibrate}
               onClick={onRetryCalibration}
             >
@@ -141,39 +97,58 @@ export default function PreSessionChecklist({
         </div>
       )}
 
-      {/* Calibration collecting progress */}
+      {/* Calibration Progress Bar */}
       {calibrationStatus === 'collecting' && (
-        <div style={{ marginTop: 12 }}>
+        <div className="readiness-collecting-wrap">
           <div className="row sp" style={{ fontSize: 12, marginBottom: 4 }}>
             <b>Measuring resting baseline...</b>
             <span>{calibrationProgress}%</span>
           </div>
-          <div className="prog" style={{ height: 10 }}>
+          <div className="prog" style={{ height: 8 }}>
             <b style={{ width: `${calibrationProgress}%` }} />
           </div>
           <p className="mut" style={{ fontSize: 11, margin: '6px 0 0' }}>
-            Hold completely still. Movement variance is tracked to ensure a stable baseline.
+            Hold completely still. Movement variance is tracked to ensure an accurate zero-degree resting baseline.
           </p>
         </div>
       )}
 
-      {/* Calibration error */}
+      {/* Calibration Error Notice */}
       {calibrationStatus === 'error' && (
-        <div
-          role="alert"
-          style={{
-            marginTop: 12,
-            padding: '10px 14px',
-            background: 'var(--badb)',
-            color: 'var(--bad)',
-            borderRadius: 8,
-            fontSize: 12,
-          }}
-        >
-          <b>Setup needs another try:</b> {calibrationMessage}
+        <div className="readiness-instruction-banner error" role="alert">
+          <span aria-hidden="true">⚠️</span>
+          <span className="instruction-text">Setup needs another try: {calibrationMessage}</span>
+          {onRetryCalibration && (
+            <button type="button" className="btn sm" onClick={onRetryCalibration}>
+              Retry
+            </button>
+          )}
         </div>
       )}
+
+      {/* 4 Compact Checks Row */}
+      <div className="readiness-checks-grid">
+        {items.map(item => {
+          const isPassed = item.check?.ok;
+          return (
+            <div
+              key={item.id}
+              className={`readiness-check-item ${isPassed ? 'check-pass' : 'check-fail'}`}
+              title={`${item.label}: ${isPassed ? item.passedLabel : item.failingLabel}`}
+            >
+              <span className="check-status-icon" aria-hidden="true">
+                {isPassed ? '✓' : '⚠️'}
+              </span>
+              <div className="check-text-group">
+                <span className="check-name">{item.label}</span>
+                <span className="check-status-desc">
+                  {isPassed ? item.passedLabel : item.failingLabel}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
-

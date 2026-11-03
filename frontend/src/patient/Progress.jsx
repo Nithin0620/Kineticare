@@ -31,36 +31,42 @@ export default function PatientProgress() {
         </div>
       )}
 
-      {/* Joint Range of Motion (ROM) Trajectory */}
+            {/* Joint Range of Motion (ROM) Trajectory */}
       {trends && Object.keys(trends.exerciseTrends).length > 0 && (
         <div className="card">
-          <h3>Joint Mobility Trajectory (ROM in Degrees)</h3>
-          <p className="mut" style={{ fontSize: 13, marginTop: 2 }}>Track your physical range of motion progress over each workout.</p>
+          <div style={{ marginBottom: 14 }}>
+            <h3 style={{ margin: '0 0 4px' }}>Joint Mobility Trajectory (ROM in Degrees)</h3>
+            <p className="mut" style={{ fontSize: 13, margin: 0 }}>Track your physical range of motion progress over each workout.</p>
+          </div>
           {Object.entries(trends.exerciseTrends).map(([exercise, points]) => (
-            <div key={exercise} style={{ margin: '14px 0 6px' }}>
-              <div className="row sp">
-                <b>{exercise}</b>
-                <span className="mut">Target: {points[0]?.targetDeg}°</span>
+            <div key={exercise} style={{ margin: '16px 0 20px', padding: '14px 16px', background: 'var(--soft)', borderRadius: 12, border: '1px solid var(--card-border)' }}>
+              <div className="row sp" style={{ marginBottom: 16 }}>
+                <b style={{ fontSize: 14 }}>{exercise}</b>
+                <span className="tag ok" style={{ fontSize: 11 }}>Target: {points[0]?.targetDeg}°</span>
               </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', height: 85, margin: '8px 0 4px' }}>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', height: 110, paddingBottom: 4 }}>
                 {points.map((pt, idx) => {
                   const target = pt.targetDeg || 45;
-                  const maxH = 65;
+                  const maxH = 60;
                   const barH = Math.min(maxH, Math.round((pt.meanPeakDeg / (target * 1.3)) * maxH));
                   const met = pt.meanPeakDeg >= target * 0.9;
                   return (
-                    <div key={idx} style={{ flex: 1, textAlign: 'center', fontSize: 11 }}>
+                    <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
                       <div
                         style={{
-                          height: Math.max(6, barH),
-                          background: met ? 'var(--pri)' : 'var(--pri2)',
-                          borderRadius: '4px 4px 0 0',
-                          marginBottom: 4,
+                          width: '100%',
+                          maxWidth: 52,
+                          minWidth: 28,
+                          height: Math.max(8, barH),
+                          background: 'var(--pri)',
+                          opacity: met ? 1 : 0.45,
+                          borderRadius: '6px 6px 0 0',
+                          marginBottom: 8,
+                          transition: 'height 0.3s ease',
                         }}
                       />
-                      <b>{pt.meanPeakDeg}°</b>
-                      <br />
-                      <span className="mut">{pt.date.slice(0, 6)}</span>
+                      <b style={{ fontSize: 12, lineHeight: 1.2, color: 'var(--ink)' }}>{pt.meanPeakDeg}°</b>
+                      <span className="mut" style={{ fontSize: 11, marginTop: 2 }}>{pt.date.slice(0, 6)}</span>
                     </div>
                   );
                 })}

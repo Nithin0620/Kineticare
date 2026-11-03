@@ -1,11 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Toast from './components/Toast';
 import Login from './components/Login';
+import LandingPage from './landing/LandingPage';
 import ErrorBoundary from './components/ErrorBoundary';
 
 import PatientLayout from './patient/Layout';
 import PatientHome from './patient/Home';
-import PatientPlan from './patient/Plan';
 import PatientPre from './patient/Pre';
 import PatientLive from './patient/Live';
 import PatientWorkout from './patient/Workout';
@@ -27,7 +27,7 @@ import { useAuth } from './auth/authContext';
 function RoleRoute({ role, children }) {
   const { user, loading } = useAuth();
   if (loading) return <div className="center"><div className="card">Loading account…</div></div>;
-  if (!user) return <Navigate to="/" replace />;
+  if (!user) return <Navigate to="/login" replace />;
   if (user.role !== role) return <Navigate to={user.role === 'patient' ? '/patient/home' : '/client/overview'} replace />;
   return children;
 }
@@ -37,7 +37,9 @@ export default function App() {
     <BrowserRouter>
       <Toast />
       <Routes>
-        <Route path="/" element={<Login />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signin" element={<Navigate to="/login" replace />} />
 
         <Route path="/patient" element={<RoleRoute role="patient"><PatientLayout /></RoleRoute>}>
           <Route index element={<Navigate to="home" replace />} />

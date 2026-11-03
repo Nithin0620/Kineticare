@@ -5,7 +5,6 @@ import {
   ankleHeelRaiseAngle,
   squatSideConfidence,
   EXERCISE_DEFINITIONS,
-  EXERCISE_REP_PARAMETERS,
   getExerciseParameters,
 } from './definitions.js';
 import { DEFAULT_REP_CONFIG } from './engine.js';
@@ -47,12 +46,26 @@ export const exerciseMeta = name => {
   if (lower.includes('heel') || lower.includes('calf') || lower.includes('ankle')) {
     return { ...EXERCISE_DEFINITIONS.heelRaise, key: 'heel-raise', name, angleLabel: 'Ankle angle' };
   }
-  return { ...EXERCISE_DEFINITIONS.armRaise, key: 'arm-raise', name, angleLabel: 'Shoulder angle (lower arm)' };
+  if (lower.includes('arm') || lower.includes('shoulder') || lower.includes('scaption') || lower.includes('raise') || lower.includes('elevation')) {
+    return { ...EXERCISE_DEFINITIONS.armRaise, key: 'arm-raise', name, angleLabel: 'Shoulder angle (lower arm)' };
+  }
+  return {
+    key: 'unmeasured',
+    name,
+    angleLabel: 'Not camera-measured',
+    cameraView: 'none',
+    setup: 'Follow the written guide or video demonstration. Camera tracking is not enabled for this exercise.',
+    isUnmeasured: true,
+  };
 };
 
 // Returns the angle to track and the body side used.
 // For Squat, when not locked, selects the side with the higher average landmark confidence (hip, knee, ankle).
 export function measureAngle(name, keypoints, lockedSide = null) {
+  const meta = exerciseMeta(name);
+  if (meta?.isUnmeasured) {
+    return { angle: null, side: lockedSide, unmeasured: true };
+  }
   let sideAngle = SIDE_ANGLE[name];
   if (!sideAngle && isSideExercise(name)) {
     const lower = String(name).toLowerCase();
